@@ -1,0 +1,16 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "truffle test",
+    "test:watch": "nodemon --ext js,sol --exec truffle test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
