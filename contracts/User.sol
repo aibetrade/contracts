@@ -25,6 +25,7 @@ struct UserStruct {
     uint64 partnerTarifUsage;
     BuyHistoryRec[] buyHistory;
     PayHistoryRec[] payHistory;
+    address[] referals;
 }
 
 // Manage users info here
@@ -59,4 +60,11 @@ contract Userable {
         users[msg.sender].partnerTarifUsage = 0;
         users[msg.sender].partnerTarifAt = block.timestamp;
     }
+
+    function getReferals(
+        address user
+    ) public view returns (address[] memory) {
+        return users[user].referals;
+    }
+
 }

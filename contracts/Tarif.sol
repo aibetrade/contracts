@@ -33,7 +33,7 @@ contract TarifData {
         return (uint16)(_tarif >> (16 * 5));
     }
 
-    function hasMaxLVComsa(uint128 _tarif) public pure returns (uint16) {
+    function getMaxLVComsa(uint128 _tarif) public pure returns (uint16) {
         return (uint16)(_tarif >> (16 * 6));
     }
 
@@ -43,47 +43,74 @@ contract TarifData {
 }
 
 contract TarifUsage {
-    function getUsedSlots(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif);
+    function getUsedSlots(uint64 _usage) public pure returns (uint16) {
+        return (uint16)(_usage);
     }
 
-    function getUsedLVSlots(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 1));
+    function getUsedLVSlots(uint64 _usage) public pure returns (uint16) {
+        return (uint16)(_usage >> (16 * 1));
     }
 
-    function getExtLevel(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 2));
+    function getExtLevel(uint64 _usage) public pure returns (uint16) {
+        return (uint16)(_usage >> (16 * 2));
     }
 
     // --- Setters
 
     function setUsedSlots(
-        uint64 _tarif,
+        uint64 _usage,
         uint16 _value
     ) public pure returns (uint64) {
-        return _tarif & (_value);
+        return _usage & (_value);
     }
 
     function setUsedLVSlots(
-        uint64 _tarif,
+        uint64 _usage,
         uint16 _value
     ) public pure returns (uint64) {
-        return _tarif & (_value << (16 * 1));
+        return _usage & (_value << (16 * 1));
     }
 
     function setExtLevel(
-        uint64 _tarif,
+        uint64 _usage,
         uint16 _value
     ) public pure returns (uint64) {
-        return _tarif & (_value << (16 * 2));
+        return _usage & (_value << (16 * 2));
     }
 }
 
-contract TarifsContract is OnlyOwner, TarifData, TarifUsage {
+contract TarifSlots is TarifData, TarifUsage {
+    function hasSlot(uint128 _tarif, uint64 _usage) internal pure returns(bool){
+        return getUsedSlots(_usage) < getNumSlots(_tarif) * (getExtLevel(_usage) + 1);
+    }
+
+    function usedSlot(uint64 _usage) internal pure returns(uint64){
+        return setUsedSlots(_usage, getUsedSlots(_usage) + 1);
+    }
+
+    function hasLVSlot(uint128 _tarif, uint64 _usage) internal pure returns(bool){
+        return getUsedLVSlots(_usage) < getNumLVSlots(_tarif) * (getExtLevel(_usage) + 1);
+    }
+
+    function usedLVSlot(uint64 _usage) internal pure returns(uint64){
+        return setUsedLVSlots(_usage, getUsedLVSlots(_usage) + 1);        
+    } 
+}
+
+
+contract TarifsContract is OnlyOwner, TarifSlots {
     uint128[] public clientTarifs;
     uint128[] public partnerTarifs;
     mapping(uint128 => bool) public tarifsHash;
     mapping(uint16 => uint8) public pPriceHash;
+
+    function clearClientTarifs() public onlyOwner {
+        clientTarifs = new uint128[](0);
+    }
+
+    function clearPartnerTarifs() public onlyOwner {
+        partnerTarifs = new uint128[](0);
+    }
 
     // Function to add a new tariff
     function addTarif(uint128 _tarif) public onlyOwner {
@@ -116,5 +143,5 @@ contract TarifsContract is OnlyOwner, TarifData, TarifUsage {
 
     function getPartnerTarifs() public view returns(uint128[] memory) {
         return partnerTarifs;
-    }
+    }   
 }

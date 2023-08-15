@@ -35,7 +35,9 @@ async function init() {
   const erc20 = await ERC20Token.deployed();
   const accounts = await web3.eth.getAccounts()
 
-  return { erc20, referal, accounts }
+  const bene = accounts[9]
+
+  return { erc20, referal, accounts, bene, C0: accounts[0], C1: accounts[1], C2: accounts[2] }
 }
 
 async function failed(prom) {
@@ -71,7 +73,7 @@ async function buyTarif(tarif, acc = null) {
   const { erc20, referal, accounts } = await init();
   acc = acc || accounts[0]
 
-  await erc20.approve(referal.address, tarif.price, { from: acc });
+  await erc20.approve(referal.address, await toErc20(tarif.price, erc20), { from: acc });
   await referal.buyTarif(tarif.pack(), { from: acc })
 
   if (tarif.isPartner())
@@ -80,13 +82,24 @@ async function buyTarif(tarif, acc = null) {
     await userHasCTarif(tarif, acc)
 }
 
-
+async function toErc20(num, erc20) {
+  const decimals = await erc20.decimals();
+  return BigInt((10 ** Number(decimals)) * Number(num));
+}
 
 
 contract("Referal-Tarif", function (/* accounts */) {
   it("Created succefully", async function () {
     await init();
     accounts = await web3.eth.getAccounts()
+  })
+
+  it("All accounts have access to contract", async function () {
+    const { referal } = await init();
+
+    for (let acc of accounts) {
+      await referal.getClientTarifs({ from: acc })
+    }
   })
 
   it("Tarfis added correctly", async function () {
@@ -167,7 +180,6 @@ contract("Referal-Tarif", function (/* accounts */) {
     const user = await referal.getUser(accounts[0]);
     assert.equal(user.clientTarifAt, 0)
     assert.equal(user.partnerTarifAt, 0)
-
   })
 
   it("Can not buy tarif without money", async function () {
@@ -176,27 +188,30 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("Can not buy tarif without mentor", async function () {
-    const { referal, erc20 } = await init();
-    await erc20.approve(referal.address, tarifs[0].price);
-    await failed(referal.buyTarif(tarifs[0].pack()))
+    await failed(buyTarif(tarifs[0]))
+  })
+
+  it("Can NOT set mentor which is not a registered member", async function () {
+    const { referal, accounts } = await init();
+    await failed(referal.setMentor(accounts[1], { from: accounts[1] }))
   })
 
   it("Mentor set is OK", async function () {
     const { referal, accounts } = await init();
-    await referal.setMentor(accounts[2])
+    await referal.setMentor(accounts[9])
   })
 
-  it("Change mentor is ERROR", async function () {
+  it("Can NOT change mentor", async function () {
     const { referal, accounts } = await init();
-    await failed(referal.setMentor(accounts[3]))
+    await failed(referal.setMentor(accounts[9]))
   })
 
   it("Can buy client tarif with money and mentor", async function () {
     const { referal, erc20 } = await init();
-    await erc20.approve(referal.address, tarifs[0].price);
-    await referal.buyTarif(tarifs[0].pack())
 
-    assert.equal(await referal.hasMaxClientTarif(), false);
+    await buyTarif(tarifs[0])
+
+    assert.equal(await referal.hasMaxClientTarif(accounts[0]), false);
   })
 
   it("Can buy another client tarif with money and mentor", async function () {
@@ -206,28 +221,23 @@ contract("Referal-Tarif", function (/* accounts */) {
     const ctBefore = TarifData.fromPack(userBefore.clientTarif)
     assert.deepEqual(ctBefore, tarifs[0])
 
-    await erc20.approve(referal.address, tarifs[1].price);
-    await referal.buyTarif(tarifs[1].pack())
+    await buyTarif(tarifs[1])
 
     const user = await referal.getUser(accounts[0])
     const ct = TarifData.fromPack(user.clientTarif)
     assert.deepEqual(ct, tarifs[1])
   })
 
-
   // Check can buy partner tarif
   it("Can not buy partner tarif (not max client tarif)", async function () {
-    const { referal, erc20, accounts } = await init();
-    const tarif = partnerTarifs[0]
-    await erc20.approve(referal.address, tarif.price);
-    await failed(referal.buyTarif(tarif.pack()))
+    await failed(buyTarif(partnerTarifs[0]))
   })
 
   it("Can NOT register (not max client tarif)", async function () {
     const { referal, erc20, accounts } = await init();
 
-    const regPrice = await referal.registerPrice();
-    await erc20.approve(referal.address, regPrice);
+    const regPrice = await toErc20(await referal.registerPrice(), erc20);
+    await erc20.approve(referal.address, await toErc20(regPrice, erc20));
     await failed(referal.RegitsterPartner())
   })
 
@@ -236,13 +246,12 @@ contract("Referal-Tarif", function (/* accounts */) {
     const { referal, erc20, accounts } = await init();
     const ct = clientTarifs[clientTarifs.length - 1]
 
-    const no = await referal.hasMaxClientTarif()
+    const no = await referal.hasMaxClientTarif(accounts[0])
     assert.deepEqual(no, false)
 
-    await erc20.approve(referal.address, ct.price);
-    await referal.buyTarif(ct.pack())
+    await buyTarif(ct)
 
-    const yes = await referal.hasMaxClientTarif()
+    const yes = await referal.hasMaxClientTarif(accounts[0])
     assert.deepEqual(yes, true)
   })
 
@@ -250,24 +259,23 @@ contract("Referal-Tarif", function (/* accounts */) {
     const { referal, erc20, accounts } = await init();
     const pt = partnerTarifs[0]
 
-    await erc20.approve(referal.address, pt.price);
-    await failed(referal.buyTarif(pt.pack()))
+    await failed(buyTarif(pt))
   })
 
   it("Can Register when max client tarif", async function () {
     const { referal, erc20, accounts } = await init();
     const regPrice = await referal.registerPrice();
-    await erc20.approve(referal.address, regPrice);
+    await erc20.approve(referal.address, await toErc20(regPrice, erc20));
     await referal.RegitsterPartner()
   })
 
   it("Can buy ONLY first partner tarif (at start)", async function () {
     const { referal, erc20, accounts } = await init();
 
-    userHasPTarif(TarifData.create())
+    await userHasPTarif(TarifData.create())
 
     // Cannot buy partner tarif more than 0 lvl
-    for (let i = 1; i < partnerTarifs; i++)
+    for (let i = 1; i < partnerTarifs.length; i++)
       await failed(buyTarif(partnerTarifs[i]))
 
     await buyTarif(partnerTarifs[0])
@@ -275,17 +283,17 @@ contract("Referal-Tarif", function (/* accounts */) {
 
   it("Can NOT buy same or another partner tarif", async function () {
     // Cannot buy partner tarif more than 0 lvl
-    for (let i = 0; i < partnerTarifs; i++)
+    for (let i = 0; i < partnerTarifs.length; i++)
       await failed(buyTarif(partnerTarifs[i]))
   })
 
   it("Can NOT extend or upgrade not filled tarif", async function () {
     const { referal, erc20, accounts } = await init();
 
-    await erc20.approve(referal.address, 10000);
+    await erc20.approve(referal.address, await toErc20(10000, erc20));
 
-    failed(referal.extendTarif())
-    failed(referal.upgradeTarif())
+    await failed(referal.extendTarif())
+    await failed(referal.upgradeTarif())
   })
 
 
@@ -298,10 +306,6 @@ contract("Referal-Tarif", function (/* accounts */) {
       assert.deepEqual(user.mentor, zeroAddress)
     }
 
-    const tx = await signer.sendTransaction({to: accounts[1], value: '0x1000000000000'});
-    let a = await web3.eth.getBalance(accounts[1])
-    console.log(a)
-
     await referal.setMentor(accounts[0], { from: accounts[1] })
 
     {
@@ -310,7 +314,51 @@ contract("Referal-Tarif", function (/* accounts */) {
     }
   })
 
-  it("C1 buy client tarif", async function () {
+  it("C0 transfer 100 to C1", async function () {
+    const { referal, erc20, C1 } = await init();
+    const uBalanceBefore = await erc20.balanceOf(accounts[1])
+
+    await erc20.transfer(C1, await toErc20(1000, erc20));
+    const uBalanceAfter = await erc20.balanceOf(accounts[1])
+
+    assert.equal((uBalanceAfter - uBalanceBefore) / (10**8), 1000)
+  })
+
+  it("C1 buy client tarif (check user logic)", async function () {
+    const { referal, erc20, accounts, bene } = await init();
+
+    const user = await referal.getUser(accounts[1])
+    console.log(user)
+
+    {
+      const tarif = clientTarifs[0]
+
+      const uBalanceBefore = await erc20.balanceOf(accounts[1])
+      const bBalanceBefore = await erc20.balanceOf(bene)
+      const mBalanceBefore = await erc20.balanceOf(user.mentor)
+
+      await buyTarif(tarif, accounts[1])
+
+      const uBalanceAfter = await erc20.balanceOf(accounts[1])
+      const bBalanceAfter = await erc20.balanceOf(bene)
+      const mBalanceAfter = await erc20.balanceOf(user.mentor)
+
+      const mpTarif = await referal.getUser(user.mentor)
+      const comsa = TarifData.fromPack(mpTarif.partnerTarif).comsa
+      console.log({comsa})
+
+      console.log(mBalanceAfter.toString(), mBalanceBefore.toString())
+      console.log(mBalanceAfter.sub(mBalanceBefore).toNumber()/ (10**8))
+
+      assert.equal((uBalanceAfter - uBalanceBefore) / (10**8), -tarif.price)
+      // assert.equal((BigInt(mBalanceAfter).minus(mBalanceBefore) / (10**8), tarif.price * (tarif.invitePercent + 5) / 100 + comsa)
+      // assert.equal((uBalanceAfter - uBalanceBefore) / (10**8), 1000)
+
+      console.log('DIFF USER', uBalanceAfter.sub(uBalanceBefore) / (10**8))
+      console.log('DIFF BENE', mBalanceAfter.sub(mBalanceBefore) / (10**8))
+      console.log('DIFF MENO', bBalanceAfter.sub(bBalanceBefore) / (10**8))
+    }
+
     // const { referal, erc20, accounts } = await init();
 
     // const aa = await referal.getPartnerTarifs();
