@@ -1,26 +1,28 @@
 
 class TarifData {
     static create(
+        key,
         price,
         invitePercent,
         numSlots,
         comsa,
         hasCompess,
         numLVSlots,
-        maxLVComsa,
         LV,
+        fullNum
     ) {
         const tarif = new TarifData()
 
         const input = {
+            key,
             price,
             invitePercent,
             numSlots,
             comsa,
             hasCompess,
             numLVSlots,
-            maxLVComsa,
-            LV
+            LV,
+            fullNum
         }
 
         for (let k of Object.keys(input)) {
@@ -34,7 +36,7 @@ class TarifData {
     static fromPack(pack) {
         pack = BigInt(pack)
         const values = []
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 16; i++) {
             values.push(Number(pack & 0xFFFFn));
             pack = pack >> 16n
         }
@@ -43,14 +45,15 @@ class TarifData {
 
     pack() {
         const fields = [
+            this.key,
             this.price,
             this.invitePercent,
             this.numSlots,
             this.comsa,
             this.hasCompess,
             this.numLVSlots,
-            this.maxLVComsa,
-            this.LV
+            this.LV,
+            this.fullNum
         ]
 
         let place = 0n

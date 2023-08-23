@@ -8,9 +8,13 @@
   },
   "scripts": {
     "test": "truffle test",
-    "test:watch": "nodemon --ext js,sol --exec truffle test"
+    "test:watch": "nodemon --ext js,sol --exec truffle test",
+    "size": "truffle run contract-size"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "truffle-contract-size": "^2.0.1"
+  }
 }

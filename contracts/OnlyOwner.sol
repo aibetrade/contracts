@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 contract OnlyOwner {
     address internal owner;
+    function setOwner(address _owner) virtual public onlyOwner{
+        owner = _owner;
+    }
 
     constructor() {
         owner = msg.sender;
