@@ -3,6 +3,16 @@ pragma solidity ^0.8.0;
 
 import "./OnlyOwner.sol";
 
+// library TarifReaderLib{
+//     function getIsRejected(uint256 _tarif) public pure returns (bool) {
+//         return (uint16)(_tarif >> (16 * 9)) > 0;
+//     }
+
+//     function getIsComsaTaken(uint256 _tarif) public pure returns (bool) {
+//         return (uint16)(_tarif >> (16 * 10)) > 0;
+//     }
+// }
+
 contract TarifReader {
     // Static tarif data (not changable)
     function tarifKey(uint256 _tarif) public pure returns (uint16) {
@@ -51,12 +61,12 @@ contract TarifReader {
 
     // --- Setters data
 
-    function setIsRejected(uint256 _tarif, bool _value) public pure returns (uint256) {
-        return _value ? (_tarif & (1 << (16 * 9))) : _tarif;
+    function setRejected(uint256 _tarif) public pure returns (uint256) {
+        return _tarif | (1 << (16 * 9));
     }
 
-    function setIsComsaTaken(uint256 _tarif, bool _value) public pure returns (uint256) {
-        return _value ? (_tarif & (1 << (16 * 10))) : _tarif;
+    function setComsaTaken(uint256 _tarif) public pure returns (uint256) {
+        return _tarif | (1 << (16 * 10));
     }
 
 
@@ -155,9 +165,17 @@ contract TarifsContractBase is OnlyOwner {
         return false;
     }
 
+    function getIsRejected(uint256 _tarif) public pure returns (bool) {
+        return (uint16)(_tarif >> (16 * 9)) > 0;
+    }
+
+    function getIsComsaTaken(uint256 _tarif) public pure returns (bool) {
+        return (uint16)(_tarif >> (16 * 10)) > 0;
+    }
+
     // Function to add a new tariff
     function append(uint256 _tarif) public onlyOwner {
-        require(!exists(_tarif), "Tarif exists");
+        require(!exists(_tarif) && !getIsRejected(_tarif) && !getIsComsaTaken(_tarif));        
         tarifs.push(_tarif);
     }
 
@@ -168,15 +186,15 @@ contract TarifsContractBase is OnlyOwner {
 }
 
 contract TarifsContract is TarifReader {
-    TarifsContractBase public ClientTarifs;
-    TarifsContractBase public PartnerTarifs;
+    TarifsContractBase public clientTarifs;
+    TarifsContractBase public partnerTarifs;
 
     constructor() {
-        ClientTarifs = new TarifsContractBase();
-        PartnerTarifs = new TarifsContractBase();
+        clientTarifs = new TarifsContractBase();
+        partnerTarifs = new TarifsContractBase();
 
-        ClientTarifs.setOwner(msg.sender);
-        PartnerTarifs.setOwner(msg.sender);
+        clientTarifs.setOwner(msg.sender);
+        partnerTarifs.setOwner(msg.sender);
     }
 
     function isT1BetterOrSameT2(uint256 _tarif1, uint256 _tarif2) public view returns (bool){
@@ -186,15 +204,15 @@ contract TarifsContract is TarifReader {
 
         if (k1 == k2) return true;
 
-        for (uint8 i = 0; i < PartnerTarifs.tarifsCount(); i++){
-            if (tarifKey(PartnerTarifs.tarifs(i)) == k2) return t1Found;
-            if (tarifKey(PartnerTarifs.tarifs(i)) == k1) t1Found = true;
+        for (uint8 i = 0; i < partnerTarifs.tarifsCount(); i++){
+            if (tarifKey(partnerTarifs.tarifs(i)) == k2) return t1Found;
+            if (tarifKey(partnerTarifs.tarifs(i)) == k1) t1Found = true;
         }
 
         return false;
     }
 
     function isLastClientTarif(uint256 _tarif) public view returns(bool){
-        return ClientTarifs.isLast(_tarif);
+        return clientTarifs.isLast(_tarif);
     }
 }

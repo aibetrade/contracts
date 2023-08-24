@@ -6,24 +6,29 @@ import "./OnlyOwner.sol";
 import "./ERC20Token.sol";
 import "./User.sol";
 
-uint16 constant REGISTRATION_KEY = 65535;
+// uint16 constant REGISTRATION_KEY = 65535;
 
-contract Referal is UsersStore, TarifsContract {
+contract Referal is UsersStore {
     ERC20Token public erc20;
 
-    // TarifsContract tarifsContract;
-
-    address bene;
-    function setBene(address _bene) public onlyOwner {
-        require(_bene != address(0));
-        bene = _bene;
+    address public cWallet;
+    function setCWallet(address _cWallet) public onlyOwner {
+        require(_cWallet != address(0));
+        cWallet = _cWallet;
     }
 
-    constructor(address _erc20, address _bene, uint8 _qBonus, address _qWallet) {
+    address public mWallet;
+    function setMWallet(address _mWallet) public onlyOwner {
+        require(_mWallet != address(0));
+        mWallet = _mWallet;
+    }
+
+    constructor(address _erc20, address _cWallet, uint8 _qBonus, address _qWallet, address _mWallet) {
         erc20 = ERC20Token(_erc20);
-        setBene(_bene);        
+        setCWallet(_cWallet);        
         setQBonus(_qBonus);
         setQWallet(_qWallet);
+        setMWallet(_mWallet);
     }
 
     mapping(uint32 => uint8) public inviteMatix;
@@ -82,7 +87,7 @@ contract Referal is UsersStore, TarifsContract {
         Logged payment to address in cents. Appends record to history.
     */
     function makePayment(address _to, uint16 _cent) internal {
-        erc20.transferFrom(msg.sender, _to, centToErc20(_cent));
+        erc20.transfer(_to, centToErc20(_cent));
         users[_to].payHistory.push(PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
     }
 
@@ -104,81 +109,54 @@ contract Referal is UsersStore, TarifsContract {
     }
 
     // --- Rejectable section
-    function canReject(address _user, uint256 _buyIndex) public view returns(bool) {        
-        require(!getIsRejected(users[_user].buyHistory[_buyIndex].tarif));
-        return (block.timestamp - users[_user].buyHistory[_buyIndex].timestamp) <= 48 * 3600;        
-    }
+    // Always reject only last buy (in history)
+    function reject() public {
+        uint256 _buyIndex = users[msg.sender].buyHistory.length - 1;
 
-    function reject(address _user, uint256 _buyIndex) public{
-        require(canReject(_user, _buyIndex));
+        require(!getIsRejected(users[msg.sender].buyHistory[_buyIndex].tarif));
+        require(block.timestamp - users[msg.sender].buyHistory[_buyIndex].timestamp <= 48 * 3600, "48h");
         
-        uint16 priceCent = getPrice(users[_user].buyHistory[_buyIndex].tarif);
-        uint16 count = users[_user].buyHistory[_buyIndex].count;
-        erc20.transfer(users[_user].buyHistory[_buyIndex].from, centToErc20(priceCent * count));
+        uint16 price = getPrice(users[msg.sender].buyHistory[_buyIndex].tarif);
+        uint16 count = users[msg.sender].buyHistory[_buyIndex].count;
+        erc20.transfer(users[msg.sender].buyHistory[_buyIndex].from, centToErc20(price * 100 * count));
 
-        uint256 tar = users[_user].buyHistory[_buyIndex].tarif;
-        // Reject registration
-        if (tarifKey(tar) == REGISTRATION_KEY){
-            users[_user].registered = false;
-        }
-        // Reject parent tarif
-        else if (isPartner(tar)){
-            users[_user].partnerTarif = users[_user].rollbackTarif;
-            users[_user].partnerTarifAt = users[_user].rollbackDate;
-            users[_user].partnerTarifUsage = users[_user].rollbackUsage;           
-        }
-        // Reject client tarif
-        else {
-            users[_user].clientTarif = users[_user].rollbackTarif;
-            users[_user].clientTarifAt = users[_user].rollbackDate;
-        }
-
-        users[_user].buyHistory[_buyIndex].tarif = setIsRejected(users[_user].buyHistory[_buyIndex].tarif, true);
-        users[_user].lastBuyAt = 0;
+        rejectBuy(_buyIndex);
     }
 
-    function canTakeComsa(address _user, uint256 _buyIndex) public view returns(bool) {
-        require(!getIsRejected(users[_user].buyHistory[_buyIndex].tarif), "Buy rejected");
-        require(!getIsComsaTaken(users[_user].buyHistory[_buyIndex].tarif), "Comsa taken");
-        return (block.timestamp - users[_user].buyHistory[_buyIndex].timestamp) > 48 * 3600;
-    }
+    function takeComsa(address _client, uint256 _buyIndex) public {
+        require(!getIsRejected(users[_client].buyHistory[_buyIndex].tarif), "Buy rejected");
+        require(!getIsComsaTaken(users[_client].buyHistory[_buyIndex].tarif), "Comsa taken");
+        require(block.timestamp - users[_client].buyHistory[_buyIndex].timestamp > 48 * 3600, "48h");
 
-    function takeComsa(address _user, uint256 _buyIndex) public{
-        require(canTakeComsa(_user, _buyIndex));
-
-        uint256 tar = users[_user].buyHistory[_buyIndex].tarif;
+        uint256 tar = users[_client].buyHistory[_buyIndex].tarif;
 
         if (tarifKey(tar) == REGISTRATION_KEY){
         }
 
         else if (isPartner(tar)){
-            partnerScheme(tar, _user);
+            partnerScheme(tar, _client);
         }
 
         else {
-            clientScheme(tar, _user);
+            clientScheme(tar, _client);
         }
 
-        users[_user].buyHistory[_buyIndex].tarif = setIsComsaTaken(tar, true);
-    }
-
-    // Can buy only if no pendig rejectable tarifs.
-    function canBuy(address user) public view returns(bool){                
-        return block.timestamp - users[user].lastBuyAt > 48 * 3600;
+        users[_client].buyHistory[_buyIndex].tarif = setComsaTaken(tar);
     }
 
     function freezeMoney(uint16 dollar) private{
-        require(canBuy(msg.sender), "48 hours");
+        require(block.timestamp - users[msg.sender].lastBuyAt > 48 * 3600, "48h");
         erc20.transferFrom(msg.sender, address(this), centToErc20(dollar * 100));
+        users[msg.sender].lastBuyAt = block.timestamp;
     }
 
     // --- Payment schemes section
     function clientScheme(uint256 _tarif, address _client) internal {
-        if (users[_client].mentor == bene || users[_client].mentor == address(0)) {
-            makePayment(bene, getPrice(_tarif));
+        if (users[_client].mentor == cWallet) {
+            makePayment(cWallet, getPrice(_tarif) * 100);
             return;
         }
-        
+
         address mentor = users[_client].mentor;
         uint16 basePriceCent = getPrice(_tarif); 
         uint16 curPriceCent = basePriceCent;
@@ -195,7 +173,7 @@ contract Referal is UsersStore, TarifsContract {
         makePayment(mentor, basePriceCent * 5 / 100);
         curPriceCent -= basePriceCent * 5 / 100;
 
-        // Company comission (30%)
+        // CWallet comission (30%)
         makePayment(mentor, basePriceCent * 30 / 100);
         curPriceCent -= basePriceCent * 30 / 100;
 
@@ -215,11 +193,11 @@ contract Referal is UsersStore, TarifsContract {
             uint256 pt = users[mentor].partnerTarif;
             uint64 ptu = users[mentor].partnerTarifUsage;
 
-            while (mentor != address(0) && mentor != bene && !(hasLVSlot(pt, ptu) && getLV(pt) > i)){
+            while (mentor != address(0) && mentor != cWallet && !(hasLVSlot(pt, ptu) && getLV(pt) > i)){
                 mentor = users[mentor].mentor;
             }
 
-            if (mentor == bene || mentor == address(0)){
+            if (mentor == cWallet || mentor == address(0)){
                 break;
             }
             else{
@@ -228,7 +206,7 @@ contract Referal is UsersStore, TarifsContract {
             }
         }
 
-        makePayment(bene, curPriceCent);
+        makePayment(mWallet, curPriceCent);
     }
 
     
@@ -240,8 +218,7 @@ contract Referal is UsersStore, TarifsContract {
     // --- Shop section (buy this, buy that)
 
     function regitsterPartner() public {
-        require(hasActiveMaxClientTarif(msg.sender), "Need max client tarif");
-        require(users[msg.sender].registered == false, "Already registered");
+        require(hasActiveMaxClientTarif(msg.sender) && !users[msg.sender].registered); // , "Not MaxCli or already reg"        
         
         freezeMoney(registerPrice);
 
@@ -251,23 +228,21 @@ contract Referal is UsersStore, TarifsContract {
     }
 
     function buyClientTarif(uint256 _tarif) public {
-        require(ClientTarifs.exists(_tarif), "Tarif not found");
-        require(users[msg.sender].mentor != address(0), "You need mentor");
+        require(clientTarifs.exists(_tarif) && users[msg.sender].mentor != address(0)); // , "NoMen or NoExTar"
+        // require(clientTarifs.exists(_tarif), "Mentor or non exists tarif");
 
         freezeMoney(getPrice(_tarif));
 
         newClientTarif(_tarif);
     }
 
-    function buyPartnerTarif(uint256 _tarif) internal {
-        require(users[msg.sender].registered, "Need registration");
-        require(hasActiveMaxClientTarif(msg.sender), "Need max client tarif");
-        require(isPartnerFullfilled(), "Not fullfilled");
+    function buyPartnerTarif(uint256 _tarif) public {
+        require(users[msg.sender].registered && hasActiveMaxClientTarif(msg.sender) && isPartnerFullfilled());
 
         uint16 count = 1;
 
         if (isPartnerTarifActive(msg.sender)){
-            require(isT1BetterOrSameT2(_tarif, users[msg.sender].partnerTarif), "Downgrade partner tarif is disabled");
+            require(isT1BetterOrSameT2(_tarif, users[msg.sender].partnerTarif));
             count = getExtLevel(users[msg.sender].partnerTarifUsage);
         }
 

@@ -9,7 +9,9 @@ class TarifData {
         hasCompess,
         numLVSlots,
         LV,
-        fullNum
+        fullNum,
+        isRejected,
+        isComsaTaken,
     ) {
         const tarif = new TarifData()
 
@@ -22,7 +24,9 @@ class TarifData {
             hasCompess,
             numLVSlots,
             LV,
-            fullNum
+            fullNum,
+            isRejected,
+            isComsaTaken,    
         }
 
         for (let k of Object.keys(input)) {
@@ -53,7 +57,9 @@ class TarifData {
             this.hasCompess,
             this.numLVSlots,
             this.LV,
-            this.fullNum
+            this.fullNum,
+            this.isRejected,
+            this.isComsaTaken    
         ]
 
         let place = 0n
