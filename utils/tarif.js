@@ -79,10 +79,10 @@ class TarifData {
 
 
 class TarifUsage {
-    static create(usedSlots, usedLVSlots, extLevel) {
+    static create(usedSlots, usedLVSlots, extLevel, filled) {
         const tarif = new TarifUsage()
 
-        const input = { usedSlots, usedLVSlots, extLevel }
+        const input = { usedSlots, usedLVSlots, extLevel, filled }
 
         for (let k of Object.keys(input)) {
             input[k] = input[k] || 0
@@ -95,7 +95,7 @@ class TarifUsage {
     static fromPack(pack) {
         pack = BigInt(pack)
         const values = []
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 5; i++) {
             values.push(Number(pack & 0xFFFFn));
             pack = pack >> 16n
         }
@@ -103,7 +103,7 @@ class TarifUsage {
     }
 
     pack() {
-        const fields = [this.usedSlots, this.usedLVSlots, this.extLevel]
+        const fields = [this.usedSlots, this.usedLVSlots, this.extLevel, this.filled]
 
         let place = 0n
         let pack = 0n;

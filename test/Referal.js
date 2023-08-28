@@ -20,17 +20,66 @@ const { web3 } = require('@openzeppelin/test-helpers/src/setup');
 // * Freeze tarifs
 
 const clientTarifs = [
-  TarifData.create(133, 10, 10),
-  TarifData.create(134, 25, 15),
-  TarifData.create(135, 50, 20),
+  TarifData.create(101, 10),
+  TarifData.create(102, 30),
+  TarifData.create(103, 50),
 ]
 
 const partnerTarifs = [
-  TarifData.create(10000 + 1, 150, 10, 15, 2),
-  TarifData.create(10000 + 2, 350, 15, 25, 3),
-  TarifData.create(10000 + 3, 700, 20, 50, 4, 1, 50, 4, 1),
-  TarifData.create(10000 + 4, 1500, 25, 100, 5, 1, 100, 5, 3),
+  // TarifData.create(10000 + 1, 150, 10, 15, 2, 0, 0, 0, 5),
+  // TarifData.create(10000 + 2, 350, 15, 25, 3, 0, 0, 0, 10),
+  // TarifData.create(10000 + 3, 700, 20, 50, 4, 1, 50, 2, 20),
+  // TarifData.create(10000 + 4, 1500, 25, 100, 5, 1, 100, 4, 40),
+
+  // TarifData.create(10000 + 1, 120, 2, 1, 2, 0, 0, 0, 5),
+  // TarifData.create(10000 + 2, 350, 3, 2, 3, 0, 0, 0, 10),
+  // TarifData.create(10000 + 3, 699, 4, 3, 4, 1, 50, 2, 20),
+  // TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 40),
+
+  TarifData.create(10000 + 1, 120, 2, 1, 2, 0, 0, 0, 2),
+  TarifData.create(10000 + 2, 350, 3, 2, 3, 0, 0, 0, 2),
+  TarifData.create(10000 + 3, 699, 4, 3, 4, 1, 50, 2, 2),
+  TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 2),
+
 ]
+
+const inviteBonusHash = [
+  [partnerTarifs[0].pack(), clientTarifs[0].pack(), 10],
+  [partnerTarifs[0].pack(), clientTarifs[1].pack(), 10],
+  [partnerTarifs[0].pack(), clientTarifs[2].pack(), 10],
+  [partnerTarifs[0].pack(), partnerTarifs[0].pack(), 10],
+  [partnerTarifs[0].pack(), partnerTarifs[1].pack(), 10],
+  [partnerTarifs[0].pack(), partnerTarifs[2].pack(), 10],
+  [partnerTarifs[0].pack(), partnerTarifs[3].pack(), 10],
+
+  [partnerTarifs[1].pack(), clientTarifs[0].pack(), 10],
+  [partnerTarifs[1].pack(), clientTarifs[1].pack(), 12],
+  [partnerTarifs[1].pack(), clientTarifs[2].pack(), 12],
+  [partnerTarifs[1].pack(), partnerTarifs[0].pack(), 10],
+  [partnerTarifs[1].pack(), partnerTarifs[1].pack(), 12],
+  [partnerTarifs[1].pack(), partnerTarifs[2].pack(), 12],
+  [partnerTarifs[1].pack(), partnerTarifs[3].pack(), 15],
+
+  [partnerTarifs[2].pack(), clientTarifs[0].pack(), 10],
+  [partnerTarifs[2].pack(), clientTarifs[1].pack(), 12],
+  [partnerTarifs[2].pack(), clientTarifs[2].pack(), 15],
+  [partnerTarifs[2].pack(), partnerTarifs[0].pack(), 10],
+  [partnerTarifs[2].pack(), partnerTarifs[1].pack(), 12],
+  [partnerTarifs[2].pack(), partnerTarifs[2].pack(), 15],
+  [partnerTarifs[2].pack(), partnerTarifs[3].pack(), 20],
+
+  [partnerTarifs[3].pack(), clientTarifs[0].pack(), 10],
+  [partnerTarifs[3].pack(), clientTarifs[1].pack(), 15],
+  [partnerTarifs[3].pack(), clientTarifs[2].pack(), 20],
+  [partnerTarifs[3].pack(), partnerTarifs[0].pack(), 10],
+  [partnerTarifs[3].pack(), partnerTarifs[1].pack(), 15],
+  [partnerTarifs[3].pack(), partnerTarifs[2].pack(), 20],
+  [partnerTarifs[3].pack(), partnerTarifs[3].pack(), 25],
+]
+
+function getInviteBonus(mTairf, uTarif) {
+  return inviteBonusHash.filter(x => x[0] == mTairf.pack() && x[1] == uTarif.pack())[0][2]
+}
 
 function maxClientTarif() {
   return clientTarifs[clientTarifs.length - 1];
@@ -60,10 +109,146 @@ async function init(isNew = false) {
       C1: accounts[1],
       C2: accounts[2],
       C3: accounts[3],
+      C4: accounts[4],
+      C5: accounts[5],
+      C6: accounts[6],
+
+      uAcc: accounts[5],
+      m1Acc: accounts[4],
+      m2Acc: accounts[3],
+      m3Acc: accounts[2],
+      m4Acc: accounts[1]
     }
   }
 
   return stack;
+}
+
+async function makeBalancer() {
+
+  const dif = (a, b) => Math.round(a * 100 - b * 100) / 100
+
+  const balancer = {
+    records: [],
+
+    async append(name) {
+      const { erc20, C1, C2, C3, C4, C5, cWallet, qWallet, mWallet } = await init();
+
+      const rec = {
+        name,
+        company: await fromErc20(await erc20.balanceOf(cWallet)),
+        quart: await fromErc20(await erc20.balanceOf(qWallet)),
+        magic: await fromErc20(await erc20.balanceOf(mWallet)),
+        c1: await fromErc20(await erc20.balanceOf(C1)),
+        c2: await fromErc20(await erc20.balanceOf(C2)),
+        c3: await fromErc20(await erc20.balanceOf(C3)),
+        c4: await fromErc20(await erc20.balanceOf(C4)),
+        c5: await fromErc20(await erc20.balanceOf(C5)),
+      }
+
+      rec.uAcc = rec.c5
+      rec.m1Acc = rec.c4
+      rec.m2Acc = rec.c3
+      rec.m3Acc = rec.c2
+      rec.m4Acc = rec.c1
+
+      this.records.push(rec)
+    },
+
+    printAll() {
+      let last = null
+      for (let rec of this.records) {
+        console.log('Step', rec.name)
+
+        console.table(rec)
+
+        if (last) {
+          // console.log('Diff', `Company: ${rec.company - last.company}`, `Quart: ${rec.quart - last.quart}`, `Magic: ${rec.magic - rec.magic}`, `C1: ${rec.c1 - last.c1}`, `C2: ${rec.c2 - rec.c2}`,)
+          console.log('Diff', `C: ${dif(rec.company, last.company)}`, `Q: ${dif(rec.quart, last.quart)}`, `M: ${dif(rec.magic, last.magic)}`, `C1: ${dif(rec.c1, last.c1)}`, `C2: ${dif(rec.c2, last.c2)}`,)
+        }
+        last = rec
+      }
+    },
+
+    print(name) {
+      const recs = this.records.filter(x => x.name == name)
+      for (let rec of recs) {
+        console.log(rec)
+      }
+    },
+
+    diff(nameb, namea) {
+      const reca = this.records.filter(x => x.name == namea)[0]
+      const recb = this.records.filter(x => x.name == nameb)[0]
+
+      if (reca && recb) {
+        const diffRec = {
+          name: `${nameb} - ${namea}`,
+          company: dif(recb.company, reca.company),
+          quart: dif(recb.quart, reca.quart),
+          magic: dif(recb.magic, reca.magic),
+          c1: dif(recb.c1, reca.c1),
+          c2: dif(recb.c2, reca.c2),
+          c3: dif(recb.c3, reca.c3),
+          c4: dif(recb.c4, reca.c4),
+          c5: dif(recb.c5, reca.c5),
+        }
+
+        diffRec.uAcc = diffRec.c5
+        diffRec.m1Acc = diffRec.c4
+        diffRec.m2Acc = diffRec.c3
+        diffRec.m3Acc = diffRec.c2
+        diffRec.m4Acc = diffRec.c1
+
+        return diffRec
+      }
+      else
+        return {}
+    },
+
+    diff2(nameb, namea) {
+      const reca = this.records.filter(x => x.name == namea)[0]
+      const recb = this.records.filter(x => x.name == nameb)[0]
+
+      if (reca && recb) {
+        const diffRec = {
+          name: `${nameb} - ${namea}`,
+          company: dif(recb.company, reca.company),
+          quart: dif(recb.quart, reca.quart),
+          magic: dif(recb.magic, reca.magic),
+          c1: dif(recb.c1, reca.c1),
+          c2: dif(recb.c2, reca.c2),
+          c3: dif(recb.c3, reca.c3),
+          c4: dif(recb.c4, reca.c4),
+          c5: dif(recb.c5, reca.c5),
+        }
+
+        diffRec.uAcc = diffRec.c5
+        diffRec.m1Acc = diffRec.c4
+        diffRec.m2Acc = diffRec.c3
+        diffRec.m3Acc = diffRec.c2
+        diffRec.m4Acc = diffRec.c1
+
+        delete diffRec.c5
+        delete diffRec.c4
+        delete diffRec.c3
+        delete diffRec.c2
+        delete diffRec.c1
+
+        return diffRec
+      }
+      else
+        return {}
+    },
+
+    printDiff(nameb, namea) {
+      console.log(this.diff(nameb, namea))
+    }
+  }
+
+  await balancer.append('init')
+
+  return balancer
 }
 
 async function mustFail(prom) {
@@ -88,8 +273,8 @@ async function userHasCTarif(ctarif, acc = null) {
 
   acc = acc || accounts[0]
 
-  const user = await referal.getUser(acc)
-  assert.deepEqual(ctarif, TarifData.fromPack(user.clientTarif))
+  const ucTarif = await referal.cTarifs(acc)
+  assert.deepEqual(ctarif, TarifData.fromPack(ucTarif.tarif))
 }
 
 async function userHasPTarif(ptarif, acc = null) {
@@ -97,8 +282,8 @@ async function userHasPTarif(ptarif, acc = null) {
 
   acc = acc || accounts[0]
 
-  const user = await referal.getUser(acc)
-  assert.deepEqual(ptarif, TarifData.fromPack(user.partnerTarif))
+  const upTarif = await referal.pTarifs(acc)
+  assert.deepEqual(ptarif, TarifData.fromPack(upTarif.tarif))
 }
 
 async function getLastBuy(acc = null) {
@@ -109,7 +294,7 @@ async function getLastBuy(acc = null) {
 }
 
 // Get all comsas
-async function getComsas(partner) {
+async function getAllComsasOf(partner) {
   const { referal, C1, C2 } = await init();
 
   let result = []
@@ -143,13 +328,39 @@ async function printUserTarifs(acc = null, msg) {
   console.log(`RB(${TarifData.fromPack(user.rollbackTarif).key})`, user.rollbackTarif.toString(), user.rollbackDate.toString(), user.rollbackUsage.toString())
 }
 
+async function prettyHistory(acc = null) {
+  const { referal, accounts } = await init();
+  acc = acc || accounts[0]
+
+  const history = (await referal.getBuyHistory(acc)).map((x, i) => {
+    const { timestamp, tarif, count } = x
+    const tar = TarifData.fromPack(tarif)
+    const { key, price, isRejected, isComsaTaken } = tar
+    return { client: acc, index: i, count: parseInt(count), price, key, isRejected, isComsaTaken, timestamp, tarif }
+  })
+
+  return history
+}
+
+function prettyHistoryRec(rec) {
+  const { from, timestamp, tarif, count } = rec
+  const tar = TarifData.fromPack(tarif)
+  const { key, price, isRejected, isComsaTaken } = tar
+  return { client: from, count: parseInt(count), price, key, isRejected, isComsaTaken, timestamp, tarif }
+}
+
 async function printBuyHistory(acc = null) {
   const { referal, accounts } = await init();
   acc = acc || accounts[0]
 
-  const buyHistory = await referal.getBuyHistory(acc)
+  const history = (await referal.getBuyHistory(acc)).map((x, i) => {
+    const { timestamp, tarif, count } = x
+    const tar = TarifData.fromPack(tarif)
+    const { key, price, isRejected, isComsaTaken } = tar
+    return { client: acc, index: i, count: parseInt(count), price, key, isRejected, isComsaTaken, timestamp, tarif }
+  })
 
-  console.log(buyHistory)
+  console.log(history)
 }
 
 async function register(acc = null) {
@@ -161,26 +372,48 @@ async function register(acc = null) {
   return referal.regitsterPartner({ from: acc })
 }
 
+async function getBuyPriceDollar(tarif, acc = null) {
+  const { erc20, referal, accounts } = await init();
+  acc = acc || accounts[0]
+
+  if (tarif.isPartner()) {
+    const ext = TarifUsage.fromPack((await referal.users(acc)).partnerTarifUsage).extLevel || 1
+    return tarif.price * ext
+  }
+  else {
+    return tarif.price
+  }
+}
+
+
 async function buyTarif(tarif, acc = null) {
   const { erc20, referal, accounts } = await init();
   acc = acc || accounts[0]
 
   const refBalanceBefore = await erc20.balanceOf(referal.address)
 
+  const ucTarifWas = await referal.cTarifs(acc)
+  const upTarifWas = await referal.pTarifs(acc)
   const userWas = await referal.users(acc)
 
   const buyHistoryWas = await referal.getBuyHistory(acc)
 
-  // --- Buy logic
-  await erc20.approve(referal.address, await toErc20(tarif.price, erc20), { from: acc });
+  const price = await getBuyPriceDollar(tarif, acc)
+  const wasPartnerTarifActive = await referal.isPartnerTarifActive(acc)
+
+
+  // --- Buy logic ---
+  await erc20.approve(referal.address, await toErc20(price, erc20), { from: acc });
   if (tarif.isPartner())
     await referal.buyPartnerTarif(tarif.pack(), { from: acc })
   else
     await referal.buyClientTarif(tarif.pack(), { from: acc })
+  // === Buy logic ===
 
+  const userAfter = await referal.users(acc)
 
   const refBalanceAfter = await erc20.balanceOf(referal.address)
-  if (await fromErc20(refBalanceAfter.sub(refBalanceBefore)) != tarif.price) throw "Income incorrect"
+  if (await fromErc20(refBalanceAfter.sub(refBalanceBefore)) != price) throw "Income incorrect"
 
   // Check tarif exists
   if (tarif.isPartner())
@@ -196,25 +429,42 @@ async function buyTarif(tarif, acc = null) {
   if (lastBuy.tarif.toString() != tarif.pack()) throw "Last buy tarif not added to history"
 
   // --- Check rollback saved ok 
-  const user = await referal.users(acc)
-
-  // console.log(tarif.key, tarif.pack())
-  // console.log("PW", userWas.partnerTarif.toString(), userWas.partnerTarifAt.toString(), userWas.partnerTarifUsage.toString())
-  // console.log("CW", userWas.clientTarif.toString(), userWas.clientTarifAt.toString())
-  // console.log("RB", user.rollbackTarif.toString(), user.rollbackDate.toString(), user.rollbackUsage.toString())
-  // console.log("PN", user.partnerTarif.toString(), user.partnerTarifAt.toString(), user.partnerTarifUsage.toString())
-  // console.log("CN", user.clientTarif.toString(), user.clientTarifAt.toString())
+  const uRollback = await referal.rollbacks(acc)
 
   // Check rollback info is correct
   if (tarif.isPartner()) {
-    if (user.rollbackTarif.toString() != userWas.partnerTarif.toString()) throw "partnerTarif tarif not saved"
-    if (user.rollbackDate.toString() != userWas.partnerTarifAt.toString()) throw "partnerTarif date not saved"
-    if (user.rollbackUsage.toString() != userWas.partnerTarifUsage.toString()) throw "partnerTarif usage not saved"
+    if (uRollback.tarif.toString() != upTarifWas.tarif.toString()) throw "partnerTarif tarif not saved"
+    if (uRollback.date.toString() != upTarifWas.boughtAt.toString()) throw "partnerTarif date not saved"
+    if (uRollback.usage.toString() != userWas.partnerTarifUsage.toString()) throw "partnerTarif usage not saved"
   }
   else {
-    if (user.rollbackTarif.toString() != userWas.clientTarif.toString()) throw "clientTarif tarif not saved"
-    if (user.rollbackDate.toString() != userWas.clientTarifAt.toString()) throw "clientTarif date not saved"
+    if (uRollback.tarif.toString() != ucTarifWas.tarif.toString()) throw "clientTarif tarif not saved"
+    if (uRollback.date.toString() != ucTarifWas.boughtAt.toString()) throw "clientTarif date not saved"
   }
+
+  // --- Check ext level is correct
+  if (tarif.isPartner()) {
+    const usageBefore = TarifUsage.fromPack(userWas.partnerTarifUsage)
+    const usageAfter = TarifUsage.fromPack(userAfter.partnerTarifUsage)
+    
+    console.log({usageBefore, usageAfter})
+    // console.log(upTarifWas.tarif.toString(), tarif.pack().toString())
+
+    if (wasPartnerTarifActive){
+      if (upTarifWas.tarif.toString() == tarif.pack().toString())
+      {
+        if (usageAfter.extLevel - usageBefore.extLevel != 1) throw "Extend tarif. EXT incorrect"
+      }
+      else
+      {
+        if (usageAfter.extLevel != usageBefore.extLevel) throw "Upgrade tarif. EXT incorrect"
+      }
+    } 
+    else{
+      if (usageAfter.extLevel != 1) throw "New tarif must have. EXT=1"
+    }
+  }
+
 }
 
 async function toErc20(dollar) {
@@ -226,7 +476,7 @@ async function toErc20(dollar) {
 async function fromErc20(wei) {
   const { erc20 } = await init();
   const decimals = await erc20.decimals();
-  return Number(BigInt(Number(wei) / (10 ** Number(decimals))));
+  return Number(Number(wei) / (10 ** Number(decimals)));
 }
 
 contract("Referal-Tarif", function (/* accounts */) {
@@ -332,9 +582,16 @@ contract("Referal-Tarif", function (/* accounts */) {
   // Check can buy partner tarif
   it("Get user test", async function () {
     const { referal, accounts } = await init();
-    const user = await referal.getUser(accounts[0]);
-    assert.equal(user.clientTarifAt, 0)
-    assert.equal(user.partnerTarifAt, 0)
+    const ucTarif = await referal.cTarifs(accounts[0]);
+    assert.equal(ucTarif.tarif, 0)
+    assert.equal(ucTarif.boughtAt, 0)
+
+    const upTarif = await referal.pTarifs(accounts[0]);
+    assert.equal(upTarif.tarif, 0)
+    assert.equal(upTarif.boughtAt, 0)
+
+    const user = await referal.users(accounts[0]);
+    assert.equal(user.partnerTarifUsage, 0)
   })
 
   // it("Can not buy client tarif without money", async function () {
@@ -487,12 +744,15 @@ contract("Referal-Tarif", function (/* accounts */) {
 
   // --- C1 section
 
-  it("giev 10000USDT to C1, C2, C3", async function () {
-    const { erc20, C1, C2, C3 } = await init();
+  it("giev 10000USDT to C1, C2, C3, C4, C5", async function () {
+    const { erc20, C1, C2, C3, C4, C5, C6 } = await init();
 
     await erc20.transfer(C1, await toErc20(10000))
     await erc20.transfer(C2, await toErc20(10000))
     await erc20.transfer(C3, await toErc20(10000))
+    await erc20.transfer(C4, await toErc20(10000))
+    await erc20.transfer(C5, await toErc20(10000))
+    await erc20.transfer(C6, await toErc20(10000))
   })
 
   it("C1 buy max ctarif, register, ptarif-0", async function () {
@@ -518,150 +778,317 @@ contract("Referal-Tarif", function (/* accounts */) {
     assert.deepEqual(user.mentor, C1)
   })
 
+  it("define InviteMatrix", async function () {
+    const { referal, C1, C2 } = await init();
+
+    for (let rec of inviteBonusHash) {
+      // console.log(TarifData.fromPack(rec[0]).key, TarifData.fromPack(rec[1]).key, rec[2])
+      await referal.setInvitePercent(rec[0], rec[1], rec[2]);
+    }
+
+    for (let rec of inviteBonusHash) {
+      // console.log(TarifData.fromPack(rec[0]).key, TarifData.fromPack(rec[1]).key, rec[2], Number(await referal.getInvitePercent(rec[0], rec[1])))
+      assert.deepEqual(Number(await referal.getInvitePercent(rec[0], rec[1])), rec[2]);
+    }
+  })
+
   it("get all comissions of Company (root partners)", async function () {
     const { referal, C1, cWallet, erc20 } = await init();
 
     await span49h();
 
-    const comsasBefore = await getComsas(cWallet);
+    const comsasBefore = await getAllComsasOf(cWallet);
     const unusedComsasBefore = comsasBefore.filter(x => !x.isRejected && !x.isComsaTaken)
     const cBalanceBefore = await erc20.balanceOf(cWallet)
 
     let sum = 0;
-    for (let com of unusedComsasBefore){
+    for (let com of unusedComsasBefore) {
       sum += com.price
       await referal.takeComsa(com.client, com.index)
-    }    
+    }
 
     const cBalanceAfter = await erc20.balanceOf(cWallet)
     assert.deepEqual(sum, await fromErc20(cBalanceAfter.sub(cBalanceBefore)))
   })
 
   it("C2 buy ctarif then C1 getComission", async function () {
-    const { referal, C1, C2 } = await init();
+    const { referal, erc20, C1, C2, cWallet, qWallet, mWallet } = await init();
 
     await buyTarif(clientTarifs[0], C2)
     await mustFail(referal.takeComsa(C2, 0))
     await span49h();
 
     // Get all comsas
-    const comsasBefore = await getComsas(C1);
+    const comsasBefore = await getAllComsasOf(C1);
     const unusedComsasBefore = comsasBefore.filter(x => !x.isRejected && !x.isComsaTaken)
 
-    // await printUserTarifs(C1, "C1")
-    // await printUserTarifs(C2, "C2")
-    // await printUserTarifs(unusedComsasBefore[0].client)
+    const bals = await makeBalancer()
 
     await referal.takeComsa(unusedComsasBefore[0].client, unusedComsasBefore[0].index)
 
-    const comsasAfter = await getComsas(C1);
+    await bals.append('After')
+
+    const comsasAfter = await getAllComsasOf(C1);
     const unusedComsasAfter = comsasAfter.filter(x => !x.isRejected && !x.isComsaTaken)
 
     assert.deepEqual(unusedComsasAfter.length, unusedComsasBefore.length - 1)
+
+    bals.print()
   })
 
+  async function getUserInfo(acc = null) {
+    const { referal, accounts } = await init();
+    acc = acc || accounts[0]
+
+    const active = await referal.isPartnerActive(acc)
+    const cTarifInfo = await referal.cTarifs(acc)
+
+    const pTarifInfo = await referal.pTarifs(acc)
+
+    const pTarifUsageInfo = (await referal.users(acc)).partnerTarifUsage
+    const pTarifUsage = TarifUsage.fromPack(pTarifUsageInfo)
+
+    const hasSlot = await referal.hasSlot(pTarifInfo.tarif, pTarifUsageInfo)
+    const hasLVSlot = await referal.hasLVSlot(pTarifInfo.tarif, pTarifUsageInfo)
+
+    // cTarifInfo.tarif = TarifData.fromPack(cTarifInfo.tarif)
+    // pTarifInfo.tarif = TarifData.fromPack(pTarifInfo.tarif)
+
+    return {
+      acc,
+      active,
+      cTarifRaw: cTarifInfo.tarif,
+      cTarifInfo: {
+        tarif: TarifData.fromPack(cTarifInfo.tarif),
+        boughtAt: Number(cTarifInfo.boughtAt),
+        gotInviteBonus: cTarifInfo.gotInviteBonus
+      },
+      pTarifRaw: pTarifInfo.tarif,
+      pTarifInfo: {
+        tarif: TarifData.fromPack(pTarifInfo.tarif),
+        boughtAt: Number(pTarifInfo.boughtAt),
+        gotInviteBonus: pTarifInfo.gotInviteBonus
+
+      },
+      pTarifUsage,
+      hasSlot,
+      hasLVSlot,
+    }
+  }
+
+  async function buildTreeUp(acc = null) {
+    const { referal, accounts } = await init();
+    acc = acc || accounts[0]
+
+    const tree = []
+
+    const cWallet = await referal.cWallet()
+
+    for (let i = 0; i < 16; i++) {
+      if (acc == zeroAddress || acc == cWallet) break;
+      const info = await getUserInfo(acc);
+      tree.push(info)
 
 
+      acc = (await referal.users(acc)).mentor     
+    }
+    return tree
+  }
 
+  async function processUserFirstComsa(acc = null) {
+    const { referal, accounts } = await init();
+    acc = acc || accounts[0]
 
-  return
+    const buyHistory = (await prettyHistory(acc)).filter(x => !x.isComsaTaken && !x.isRejected)
+    const lastComsaRec = buyHistory[0]
+    if (!lastComsaRec) return;
 
-  it("Can NOT extend or upgrade not filled tarif", async function () {
-    const { referal, erc20, accounts } = await init();
+    const tar = TarifData.fromPack(lastComsaRec.tarif)
+    // const gotInviteBonus = (await (tar.isPartner() ? referal.pTarifs(acc) : referal.cTarifs(acc))).gotInviteBonus
 
-    await erc20.approve(referal.address, await toErc20(10000, erc20));
+    const tree = await buildTreeUp(acc)
 
-    await mustFail(referal.extendTarif())
-    await mustFail(referal.upgradeTarif())
-  })
+    const mentor = (await referal.users(acc)).mentor
+    // console.log(tree)
+    // return
 
+    const uInfoBefore = await getUserInfo(acc)
+    const mInfoBefore = await getUserInfo(mentor)
+    const bals = await makeBalancer()
 
-  // --- "Referal-Money-Client"
-  it("C1 registered under C0", async function () {
-    const { referal, erc20, accounts } = await init();
+    await referal.takeComsa(acc, lastComsaRec.index)
 
-    {
-      const user = await referal.getUser(accounts[1])
-      assert.deepEqual(user.mentor, zeroAddress)
+    const uInfoAfter = await getUserInfo(acc)
+    const mInfoAfter = await getUserInfo(mentor)
+
+    // Check slots
+    if (mInfoBefore.hasSlot) {
+      if (mInfoAfter.pTarifUsage.usedSlots - mInfoBefore.pTarifUsage.usedSlots != 1) throw "usedSlots error"
+    } else {
+      if (mInfoAfter.pTarifUsage.usedSlots - mInfoBefore.pTarifUsage.usedSlots != 0) throw "usedSlots error"
     }
 
-    await referal.setMentor(accounts[0], { from: accounts[1] })
+    let m1Comsa = 0
 
     {
-      const user = await referal.getUser(accounts[1])
-      assert.deepEqual(user.mentor, accounts[0])
+      const tarifData = tar.isPartner() ? uInfoBefore.pTarifInfo : uInfoBefore.cTarifInfo;
+      // console.log(tarifData.gotInviteBonus)
+
+      if (!tarifData.gotInviteBonus)
+        m1Comsa += getInviteBonus(mInfoBefore.pTarifInfo.tarif, uInfoAfter.cTarifInfo.tarif) * tar.price / 100
+    }
+
+
+    // console.log(m1Comsa)
+
+    // console.log(await Promise.all(tree.map(x => referal.getLV(x.pTarifRaw))))
+
+    // console.log(tree.map(x => x.pTarifInfo.tarif.numLVSlots))
+    // console.log(tree.map(x => x.pTarifInfo.tarif.LV))
+    // console.log(tree.map(x => x.pTarifUsage))
+
+    // Calc top comsas
+
+    // Check mentor comsa
+
+    // Check lv slots
+
+
+
+    await bals.append("after")
+    // console.log(bals.diff2('after', 'init'))
+
+    // console.log('uinfo', uInfoBefore, uInfoAfter)
+    // console.log('minfo', mInfoBefore, mInfoAfter)
+
+    const d = bals.diff('after', 'init')
+    const { price, count } = lastComsaRec
+    const sumPayed = price * count
+
+    assert.deepEqual(sumPayed * 30 / 100, d.company)
+    assert.deepEqual(sumPayed * 5 / 100, d.quart)
+
+    // console.log(bals.diff2('after', 'init'))
+
+    let mentorCom = 0
+    // if (!gotInviteBonus){
+    //   const m1PTarif = await referal.pTarifs[m1Acc].tarif
+    //   const ip = inviteMatrix[m1PTarif, hrec.tarif]
+    //   mentorCom += sum * ip / 100
+    // }
+  }
+
+  it("build chan C1->C2->C3->C4->C5 + register", async function () {
+    const { referal, erc20, C1, C2, C3, C4, C5 } = await init();
+
+
+    const uAcc = C5;
+    const m1Acc = C4;
+    const m2Acc = C3;
+    const m3Acc = C2;
+    const m4Acc = C1;
+
+    // await referal.setMentor(C1, { from: C2 })
+    await referal.setMentor(m1Acc, { from: uAcc })
+    await referal.setMentor(m2Acc, { from: m1Acc })
+    await referal.setMentor(m3Acc, { from: m2Acc })
+    // await referal.setMentor(m4Acc, { from: m3Acc })    
+
+    await buyTarif(maxClientTarif(), uAcc)
+    await buyTarif(maxClientTarif(), m1Acc)
+    await buyTarif(maxClientTarif(), m2Acc)
+    await buyTarif(maxClientTarif(), m3Acc)
+    await buyTarif(maxClientTarif(), m4Acc)
+    await span49h();
+
+    await register(m1Acc)
+    await register(m2Acc)
+    await register(m3Acc)
+    await span49h();
+  })
+
+  it("All buy partner tarifs", async function () {
+    const { referal, erc20, C1, C2, C3, C4, C5 } = await init();
+
+    const uAcc = C5;
+    const m1Acc = C4;
+    const m2Acc = C3;
+    const m3Acc = C2;
+    const m4Acc = C1;
+
+    await buyTarif(partnerTarifs[0], m1Acc)
+    await buyTarif(partnerTarifs[2], m2Acc)
+    await buyTarif(partnerTarifs[3], m3Acc)
+    await span49h();
+  })
+
+  // it("Take comsa (slot free)", async function () {
+  //   const { referal, erc20, uAcc, m1Acc } = await init();
+
+  //   const ui1Before = await getUserInfo(m1Acc)
+
+  //   await buyTarif(maxClientTarif(), uAcc)
+  //   await span49h();
+
+  //   await processUserFirstComsa(uAcc)
+
+  //   const ui1After = await getUserInfo(m1Acc)
+
+
+  //   // console.log(ui1Before, ui1After)
+
+  // })
+
+  it("Take comsa test", async function () {
+    const { referal, erc20, uAcc, m1Acc } = await init();
+
+    for (let i = 0; i < 4; i++) {
+
+      await buyTarif(maxClientTarif(), uAcc)
+      await span49h();
+
+      await processUserFirstComsa(uAcc)
+    }
+
+    return
+  })
+
+  it("Can extend filled tarif", async function () {
+    const { referal, erc20, uAcc, m1Acc } = await init();
+
+    // // const tarif = TarifData.fromPack((await referal.pTarifs(m1Acc)).tarif)
+    // // const usage = TarifUsage.fromPack((await referal.users(m1Acc)).partnerTarifUsage)
+
+    // console.log({tarif, usage})
+
+    await buyTarif(partnerTarifs[0], m1Acc);
+  })
+
+  it("Take comsa test", async function () {
+    const { referal, erc20, uAcc, m1Acc } = await init();
+
+    for (let i = 0; i < 10; i++) {
+
+      await buyTarif(maxClientTarif(), uAcc)
+      await span49h();
+
+      await processUserFirstComsa(uAcc)
     }
   })
 
-  it("C0 transfer 100 to C1", async function () {
-    const { referal, erc20, C1 } = await init();
-    const uBalanceBefore = await erc20.balanceOf(accounts[1])
+  it("Can upgrade filled tarif", async function () {
+    const { referal, erc20, uAcc, m1Acc } = await init();
 
-    await erc20.transfer(C1, await toErc20(1000, erc20));
-    const uBalanceAfter = await erc20.balanceOf(accounts[1])
+    const tarif = TarifData.fromPack((await referal.pTarifs(m1Acc)).tarif)
+    const usage = TarifUsage.fromPack((await referal.users(m1Acc)).partnerTarifUsage)
 
-    assert.equal((uBalanceAfter - uBalanceBefore) / (10 ** 8), 1000)
-  })
+    console.log({tarif, usage})
 
-  it("C1 buy client tarif (check user logic)", async function () {
-    const { referal, erc20, accounts, cWallet } = await init();
+    await buyTarif(maxClientTarif(), m1Acc)
+    await span49h();
 
-    const user = await referal.getUser(accounts[1])
-    console.log(user)
-
-    {
-      const tarif = clientTarifs[0]
-
-      const uBalanceBefore = await erc20.balanceOf(accounts[1])
-      const bBalanceBefore = await erc20.balanceOf(cWallet)
-      const mBalanceBefore = await erc20.balanceOf(user.mentor)
-
-      await buyTarif(tarif, accounts[1])
-
-      const uBalanceAfter = await erc20.balanceOf(accounts[1])
-      const bBalanceAfter = await erc20.balanceOf(cWallet)
-      const mBalanceAfter = await erc20.balanceOf(user.mentor)
-
-      const mpTarif = await referal.getUser(user.mentor)
-      const comsa = TarifData.fromPack(mpTarif.partnerTarif).comsa
-      console.log({ comsa })
-
-      console.log(mBalanceAfter.toString(), mBalanceBefore.toString())
-      console.log(mBalanceAfter.sub(mBalanceBefore).toNumber() / (10 ** 8))
-
-      assert.equal((uBalanceAfter - uBalanceBefore) / (10 ** 8), -tarif.price)
-      // assert.equal((BigInt(mBalanceAfter).minus(mBalanceBefore) / (10**8), tarif.price * (tarif.invitePercent + 5) / 100 + comsa)
-      // assert.equal((uBalanceAfter - uBalanceBefore) / (10**8), 1000)
-
-      console.log('DIFF USER', uBalanceAfter.sub(uBalanceBefore) / (10 ** 8))
-      console.log('DIFF cWallet', mBalanceAfter.sub(mBalanceBefore) / (10 ** 8))
-      console.log('DIFF MENO', bBalanceAfter.sub(bBalanceBefore) / (10 ** 8))
-    }
-
-    // const { referal, erc20, accounts } = await init();
-
-    // const aa = await referal.getpartnerTarifs();
-    // console.log('aaaaaaaaaaaaaaa', aa, accounts[1])
-
-
-
-    // const ss = await referal.getpartnerTarifs({from: accounts[1]});
-    // console.log('sssssssssssssssssss', ss)
-
-    // const ss = await referal.partnerTarifs(0, { from: accounts[1] });
-    // console.log('sssssssssssssssssss', ss)
-
-
-    // const hh = await referal.tarifsHash(tarif.pack(), {from: accounts[1]});
-    // console.log('hhhhhhhhhhhh', hh)
-
-
-    // await userHasCTarif(TarifData.create(), accounts[1])
-    // await buyTarif(clientTarifs[0], accounts[1])
-    // await userHasCTarif(clientTarifs[0], accounts[1])
-
-    // Check money cheme
-  })
+    await buyTarif(partnerTarifs[2], m1Acc);
+  })  
 })
 
 

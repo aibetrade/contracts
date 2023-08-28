@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import "./OnlyOwner.sol";
 
+uint16 constant REGISTRATION_KEY = 65535;
+
+
 // library TarifReaderLib{
 //     function getIsRejected(uint256 _tarif) public pure returns (bool) {
 //         return (uint16)(_tarif >> (16 * 9)) > 0;
@@ -12,6 +15,7 @@ import "./OnlyOwner.sol";
 //         return (uint16)(_tarif >> (16 * 10)) > 0;
 //     }
 // }
+
 
 contract TarifReader {
     // Static tarif data (not changable)
@@ -31,12 +35,12 @@ contract TarifReader {
         return (uint16)(_tarif >> (16 * 3));
     }
 
-    function getComsa(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 4));
-    }
+    // function getComsa(uint256 _tarif) public pure returns (uint16) {
+    //     return (uint16)(_tarif >> (16 * 4));
+    // }
 
-    function hasCompress(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 5));
+    function hasCompress(uint256 _tarif) public pure returns (bool) {
+        return (uint16)(_tarif >> (16 * 5)) > 0;
     }
 
     function getNumLVSlots(uint256 _tarif) public pure returns (uint16) {
@@ -69,8 +73,11 @@ contract TarifReader {
         return _tarif | (1 << (16 * 10));
     }
 
-
     // ---
+    function isRegister(uint256 _tarif) public pure returns (bool) {
+        return tarifKey(_tarif) == REGISTRATION_KEY;
+    }
+
     function isPartner(uint256 _tarif) public pure returns (bool) {
         return getNumSlots(_tarif) > 0;
     }
@@ -88,30 +95,17 @@ contract TarifReader {
         return (uint16)(_usage >> (16 * 2));
     }
 
+    function getFilled(uint64 _usage) public pure returns (uint16) {
+        return (uint16)(_usage >> (16 * 3));
+    }
+
     // --- Setters
 
-    function setUsedSlots(
-        uint64 _usage,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _usage & (_value);
-    }
-
-    function setUsedLVSlots(
-        uint64 _usage,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _usage & (_value << (16 * 1));
-    }
-
-    function setExtLevel(
-        uint64 _usage,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _usage & (_value << (16 * 2));
-    }
-
     // Dynamic info about slots
+    function buildUsage(uint64 _usedSlots, uint64 _usedLVSlots, uint64 _extLevel, uint64 _filled) public pure returns (uint64){
+        return _usedSlots | (_usedLVSlots << (16 * 1)) | (_extLevel << (16 * 2)) | (_filled << (16 * 3));
+    }
+
     function hasSlot(uint256 _tarif, uint64 _usage) public pure returns (bool) {
         return
             getUsedSlots(_usage) <
@@ -119,7 +113,7 @@ contract TarifReader {
     }
 
     function useSlot(uint64 _usage) public pure returns (uint64) {
-        return setUsedSlots(_usage, getUsedSlots(_usage) + 1);
+        return buildUsage(getUsedSlots(_usage) + 1, getUsedLVSlots(_usage), getExtLevel(_usage), getFilled(_usage));
     }
 
     function hasLVSlot(
@@ -132,8 +126,12 @@ contract TarifReader {
     }
 
     function useLVSlot(uint64 _usage) public pure returns (uint64) {
-        return setUsedLVSlots(_usage, getUsedLVSlots(_usage) + 1);
+        return buildUsage(getUsedSlots(_usage), getUsedLVSlots(_usage) + 1, getExtLevel(_usage), getFilled(_usage));
     }
+
+    function useFill(uint64 _usage) public pure returns (uint64) {
+        return buildUsage(getUsedSlots(_usage), getUsedLVSlots(_usage), getExtLevel(_usage), getFilled(_usage) + 1);
+    }    
 }
 
 contract TarifsContractBase is OnlyOwner {
@@ -151,6 +149,13 @@ contract TarifsContractBase is OnlyOwner {
     // Static tarif data (not changable)
     function tarifKey(uint256 _tarif) public pure returns (uint16) {
         return (uint16)(_tarif);
+    }
+
+    // Static tarif data (not changable)
+    function tarif(uint16 _key) public view returns (uint256) {
+        for (uint8 i = 0; i < tarifs.length; i++)
+            if (tarifKey(tarifs[i]) == _key) return tarifs[i];
+        return 0;
     }
 
     function clear() public onlyOwner {
@@ -198,21 +203,22 @@ contract TarifsContract is TarifReader {
     }
 
     function isT1BetterOrSameT2(uint256 _tarif1, uint256 _tarif2) public view returns (bool){
-        bool t1Found = false;
+        bool t2Found = false;
         uint16 k1 = tarifKey(_tarif1);
         uint16 k2 = tarifKey(_tarif2);
 
-        if (k1 == k2) return true;
+        if (k2 == 0) return true; // Any model better then none.
+        // if (k1 == k2) return true;
 
         for (uint8 i = 0; i < partnerTarifs.tarifsCount(); i++){
-            if (tarifKey(partnerTarifs.tarifs(i)) == k2) return t1Found;
-            if (tarifKey(partnerTarifs.tarifs(i)) == k1) t1Found = true;
+            if (tarifKey(partnerTarifs.tarifs(i)) == k2) t2Found = true;
+            if (tarifKey(partnerTarifs.tarifs(i)) == k1) return t2Found;
         }
 
         return false;
     }
 
-    function isLastClientTarif(uint256 _tarif) public view returns(bool){
-        return clientTarifs.isLast(_tarif);
-    }
+    // function isLastClientTarif(uint256 _tarif) public view returns(bool){
+    //     return clientTarifs.isLast(_tarif);
+    // }
 }

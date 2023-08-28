@@ -6,12 +6,11 @@ import "./OnlyOwner.sol";
 
 uint256 constant MONTH = 30 * 86400;
 uint256 constant YEAR = 360 * 86400;
-uint16 constant REGISTRATION_KEY = 65535;
 
 struct PayHistoryRec {
     address from;
     uint256 timestamp;
-    uint16 cents;
+    uint32 cents;
 }
 
 struct BuyHistoryRec {
@@ -21,16 +20,21 @@ struct BuyHistoryRec {
     uint16 count; // How many tarifs was bought
 }
 
+struct RollbackStruct {
+    uint256 tarif; // If reject rollback to this tarif
+    uint256 date; // If reject rollback to this date
+    uint64 usage; // If reject rollback to this date
+}
+
+struct UserTarifStruct {
+    uint256 tarif;
+    uint256 boughtAt;
+    bool gotInviteBonus;
+}
+
 struct UserStruct {
     bool registered;
     address mentor;
-    uint256 rollbackTarif; // If reject rollback to this tarif
-    uint256 rollbackDate; // If reject rollback to this date
-    uint64 rollbackUsage; // If reject rollback to this date
-    uint256 clientTarif;
-    uint256 clientTarifAt;
-    uint256 partnerTarif;
-    uint256 partnerTarifAt;
     uint64 partnerTarifUsage;
     BuyHistoryRec[] buyHistory;
     PayHistoryRec[] payHistory;
@@ -41,6 +45,9 @@ struct UserStruct {
 // Manage users info here
 contract UsersStore is TarifsContract, OnlyOwner {
     mapping(address => UserStruct) public users;
+    mapping(address => UserTarifStruct) public cTarifs;
+    mapping(address => UserTarifStruct) public pTarifs;
+    mapping(address => RollbackStruct) public rollbacks;
 
     address[] public registeredUsers;
 
@@ -49,8 +56,8 @@ contract UsersStore is TarifsContract, OnlyOwner {
     }
 
     function setMentor(address mentor) public {
-        require(mentor != address(0), "Mentor can not be 0");
-        require(users[msg.sender].mentor == address(0), "Already have mentor");
+        require(mentor != address(0));
+        require(users[msg.sender].mentor == address(0));
 
         registeredUsers.push(msg.sender);
         users[msg.sender].mentor = mentor;
@@ -58,10 +65,6 @@ contract UsersStore is TarifsContract, OnlyOwner {
     }
 
     // --- User space
-
-    function getUser(address user) public view returns (UserStruct memory) {
-        return users[user];
-    }
 
     function getBuyHistory(
         address user
@@ -76,19 +79,20 @@ contract UsersStore is TarifsContract, OnlyOwner {
     }
 
     function isClientTarifActive(address _client) public view returns (bool) {
-        return block.timestamp - users[_client].clientTarifAt <= MONTH;
+        return block.timestamp - cTarifs[_client].boughtAt <= MONTH;
     }
 
     function isPartnerTarifActive(address _partner) public view returns (bool) {
-        return block.timestamp - users[_partner].partnerTarifAt <= YEAR;
+        return block.timestamp - pTarifs[_partner].boughtAt <= YEAR;
     }
 
     function newClientTarif(uint256 _tarif) internal {
-        users[msg.sender].rollbackTarif = users[msg.sender].clientTarif;
-        users[msg.sender].rollbackDate = users[msg.sender].clientTarifAt;
+        // uint256 tarif = clientTarifs.tarif(_key);
+        rollbacks[msg.sender].tarif = cTarifs[msg.sender].tarif;
+        rollbacks[msg.sender].date = cTarifs[msg.sender].boughtAt;
 
-        users[msg.sender].clientTarif = _tarif;
-        users[msg.sender].clientTarifAt = block.timestamp;
+        cTarifs[msg.sender].tarif = _tarif;
+        cTarifs[msg.sender].boughtAt = block.timestamp;
 
         users[msg.sender].buyHistory.push(
             BuyHistoryRec({
@@ -101,14 +105,13 @@ contract UsersStore is TarifsContract, OnlyOwner {
     }
 
     function newPartnerTarif(uint256 _tarif, uint16 _count) internal {
-        users[msg.sender].rollbackTarif = users[msg.sender].partnerTarif;
-        users[msg.sender].rollbackDate = users[msg.sender].partnerTarifAt;
-        users[msg.sender].rollbackUsage = users[msg.sender].partnerTarifUsage;
+        rollbacks[msg.sender].tarif = pTarifs[msg.sender].tarif;
+        rollbacks[msg.sender].date = pTarifs[msg.sender].boughtAt;
+        rollbacks[msg.sender].usage = users[msg.sender].partnerTarifUsage;
 
         if (tarifKey(_tarif) != REGISTRATION_KEY) {
-            users[msg.sender].partnerTarif = _tarif;
-            users[msg.sender].partnerTarifUsage = 0;
-            users[msg.sender].partnerTarifAt = block.timestamp;
+            pTarifs[msg.sender].tarif = _tarif;
+            pTarifs[msg.sender].boughtAt = block.timestamp;
         }
 
         users[msg.sender].buyHistory.push(
@@ -130,14 +133,14 @@ contract UsersStore is TarifsContract, OnlyOwner {
         }
         // Reject parent tarif
         else if (isPartner(tar)) {
-            users[msg.sender].partnerTarif = users[msg.sender].rollbackTarif;
-            users[msg.sender].partnerTarifAt = users[msg.sender].rollbackDate;
-            users[msg.sender].partnerTarifUsage = users[msg.sender].rollbackUsage;
+            pTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
+            pTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
+            users[msg.sender].partnerTarifUsage = rollbacks[msg.sender].usage;
         }
         // Reject client tarif
         else {
-            users[msg.sender].clientTarif = users[msg.sender].rollbackTarif;
-            users[msg.sender].clientTarifAt = users[msg.sender].rollbackDate;
+            cTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
+            cTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
         }
 
         users[msg.sender].buyHistory[_buyIndex].tarif = setRejected(users[msg.sender].buyHistory[_buyIndex].tarif);
