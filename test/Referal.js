@@ -18,6 +18,8 @@ const { web3 } = require('@openzeppelin/test-helpers/src/setup');
 
 const {clientTarifs, partnerTarifs, inviteBonusHash} = require('./tarifs-data')
 
+const tarifs = [...clientTarifs, ...partnerTarifs]
+
 function getInviteBonus(mTairf, uTarif) {
   return inviteBonusHash.filter(x => x[0] == mTairf.pack() && x[1] == uTarif.pack())[0][2]
 }
@@ -25,8 +27,6 @@ function getInviteBonus(mTairf, uTarif) {
 function maxClientTarif() {
   return clientTarifs[clientTarifs.length - 1];
 }
-
-const tarifs = [...clientTarifs, ...partnerTarifs]
 
 let stack = null
 
@@ -320,10 +320,8 @@ async function getBuyPriceDollar(tarif, acc = null) {
   const { erc20, referal, usersStore, accounts } = await init();
   acc = acc || accounts[0]
 
-  console.log("TARIF", tarif)
-
   if (tarif.isPartner()) {
-    const ext = TarifUsage.fromPack((await usersStore.getUsage(acc)).extLevel || 1)
+    const ext = TarifUsage.fromPack(await usersStore.getUsage(acc)).extLevel || 1
     return tarif.price * ext
   }
   else {
@@ -349,7 +347,7 @@ async function buyTarif(tarif, acc = null) {
 
 
   // --- Buy logic ---
-  await erc20.approve(referal.address, await toErc20(price, erc20), { from: acc });
+  await erc20.approve(referal.address, await toErc20(price), { from: acc });
   if (tarif.isPartner())
     await referal.buyPartnerTarif(tarif.pack(), { from: acc })
   else
@@ -393,7 +391,7 @@ async function buyTarif(tarif, acc = null) {
     const usageBefore = TarifUsage.fromPack(userWas.partnerTarifUsage)
     const usageAfter = TarifUsage.fromPack(userAfter.partnerTarifUsage)
 
-    console.log({ usageBefore, usageAfter })
+    // console.log({ usageBefore, usageAfter })
     // console.log(upTarifWas.tarif.toString(), tarif.pack().toString())
 
     if (wasPartnerTarifActive) {
@@ -592,11 +590,10 @@ contract("Referal-Tarif", function (/* accounts */) {
   it("Can NOT register (not max client tarif)", async function () {
     const { referal, erc20, accounts } = await init();
 
-    const regPrice = await toErc20(await referal.registerPrice(), erc20);
+    const regPrice = await referal.registerPrice();
     await erc20.approve(referal.address, await toErc20(regPrice, erc20));
     await mustFail(referal.regitsterPartner())
   })
-
 
   // Buy client tarif
   it("Can buy maximum client tarif (after 48h)", async function () {
@@ -647,7 +644,7 @@ contract("Referal-Tarif", function (/* accounts */) {
 
   // --- Rejection tests
   it("Can buy client tarif and reject if <48h", async function () {
-    const { referal, accounts, erc20 } = await init();
+    const { referal, usersStore, accounts, erc20 } = await init();
 
     // console.log(await getLastBuy(accounts[0]))
 
@@ -824,7 +821,7 @@ contract("Referal-Tarif", function (/* accounts */) {
   }
 
   async function buildTreeUp(acc = null) {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
     acc = acc || accounts[0]
 
     const tree = []
@@ -837,13 +834,13 @@ contract("Referal-Tarif", function (/* accounts */) {
       tree.push(info)
 
 
-      acc = (await referal.users(acc)).mentor
+      acc = (await usersStore.users(acc)).mentor
     }
     return tree
   }
 
   async function processUserFirstComsa(acc = null) {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
     acc = acc || accounts[0]
 
     const buyHistory = (await prettyHistory(acc)).filter(x => !x.isComsaTaken && !x.isRejected)
@@ -855,7 +852,7 @@ contract("Referal-Tarif", function (/* accounts */) {
 
     const tree = await buildTreeUp(acc)
 
-    const mentor = (await referal.users(acc)).mentor
+    const mentor = (await usersStore.users(acc)).mentor
     // console.log(tree)
     // return
 
@@ -917,7 +914,7 @@ contract("Referal-Tarif", function (/* accounts */) {
 
     // console.log(bals.diff2('after', 'init'))
 
-    let mentorCom = 0
+    // let mentorCom = 0
     // if (!gotInviteBonus){
     //   const m1PTarif = await referal.pTarifs[m1Acc].tarif
     //   const ip = inviteMatrix[m1PTarif, hrec.tarif]
@@ -996,8 +993,6 @@ contract("Referal-Tarif", function (/* accounts */) {
 
       await processUserFirstComsa(uAcc)
     }
-
-    return
   })
 
   it("Can extend filled tarif", async function () {
@@ -1025,11 +1020,6 @@ contract("Referal-Tarif", function (/* accounts */) {
 
   it("Can upgrade filled tarif", async function () {
     const { referal, usersStore, erc20, uAcc, m1Acc } = await init();
-
-    const tarif = TarifData.fromPack((await usersStore.pTarifs(m1Acc)).tarif)
-    const usage = TarifUsage.fromPack(await usersStore.getUsage(m1Acc))
-
-    console.log({ tarif, usage })
 
     await buyTarif(maxClientTarif(), m1Acc)
     await span49h();

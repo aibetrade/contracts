@@ -112,10 +112,10 @@ contract Referal is OnlyOwner {
     // --- Rejectable section
     // Always reject only last buy (in history)
     function reject() public {
+        require(usersStore.canReject(msg.sender));
         BuyHistoryRec memory bhr = usersStore.getLastPay(msg.sender);
 
-        require(!TarifDataLib.getIsRejected(bhr.tarif) 
-            && block.timestamp - bhr.timestamp <= 48 * 3600);
+        // require(!TarifDataLib.getIsRejected(bhr.tarif)  && block.timestamp - bhr.timestamp <= 48 * 3600);
         
         uint16 price = TarifDataLib.getPrice(bhr.tarif);
         uint16 count = bhr.count;
