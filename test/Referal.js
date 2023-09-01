@@ -481,7 +481,8 @@ async function fromErc20(wei) {
 
 contract("Referal-Tarif", function (/* accounts */) {
   it("Created succefully", async function () {
-    await init();
+    const {referal} = await init();
+    console.log(referal.address)
   })
 
   it("All accounts have access to contract", async function () {
