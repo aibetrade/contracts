@@ -109,7 +109,7 @@ contract UsersStore is TarifsContract, OnlyOwner {
         rollbacks[msg.sender].date = pTarifs[msg.sender].boughtAt;
         rollbacks[msg.sender].usage = users[msg.sender].partnerTarifUsage;
 
-        if (tarifKey(_tarif) != REGISTRATION_KEY) {
+        if (TarifReaderLib.tarifKey(_tarif) != REGISTRATION_KEY) {
             pTarifs[msg.sender].tarif = _tarif;
             pTarifs[msg.sender].boughtAt = block.timestamp;
         }
@@ -128,7 +128,7 @@ contract UsersStore is TarifsContract, OnlyOwner {
         uint256 tar = users[msg.sender].buyHistory[_buyIndex].tarif;
 
         // Reject registration
-        if (tarifKey(tar) == REGISTRATION_KEY) {
+        if (TarifReaderLib.tarifKey(tar) == REGISTRATION_KEY) {
             users[msg.sender].registered = false;
         }
         // Reject parent tarif

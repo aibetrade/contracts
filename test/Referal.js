@@ -39,8 +39,7 @@ const partnerTarifs = [
   TarifData.create(10000 + 1, 120, 2, 1, 2, 0, 0, 0, 2),
   TarifData.create(10000 + 2, 350, 3, 2, 3, 0, 0, 0, 2),
   TarifData.create(10000 + 3, 699, 4, 3, 4, 1, 50, 2, 2),
-  TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 2),
-
+  TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 2)
 ]
 
 const inviteBonusHash = [
@@ -446,21 +445,19 @@ async function buyTarif(tarif, acc = null) {
   if (tarif.isPartner()) {
     const usageBefore = TarifUsage.fromPack(userWas.partnerTarifUsage)
     const usageAfter = TarifUsage.fromPack(userAfter.partnerTarifUsage)
-    
-    console.log({usageBefore, usageAfter})
+
+    console.log({ usageBefore, usageAfter })
     // console.log(upTarifWas.tarif.toString(), tarif.pack().toString())
 
-    if (wasPartnerTarifActive){
-      if (upTarifWas.tarif.toString() == tarif.pack().toString())
-      {
+    if (wasPartnerTarifActive) {
+      if (upTarifWas.tarif.toString() == tarif.pack().toString()) {
         if (usageAfter.extLevel - usageBefore.extLevel != 1) throw "Extend tarif. EXT incorrect"
       }
-      else
-      {
+      else {
         if (usageAfter.extLevel != usageBefore.extLevel) throw "Upgrade tarif. EXT incorrect"
       }
-    } 
-    else{
+    }
+    else {
       if (usageAfter.extLevel != 1) throw "New tarif must have. EXT=1"
     }
   }
@@ -481,7 +478,10 @@ async function fromErc20(wei) {
 
 contract("Referal-Tarif", function (/* accounts */) {
   it("Created succefully", async function () {
-    await init();
+    const { referal, accounts } = await init();
+
+    console.log(referal.address, accounts)
+
   })
 
   it("All accounts have access to contract", async function () {
@@ -890,7 +890,7 @@ contract("Referal-Tarif", function (/* accounts */) {
       tree.push(info)
 
 
-      acc = (await referal.users(acc)).mentor     
+      acc = (await referal.users(acc)).mentor
     }
     return tree
   }
@@ -1082,13 +1082,13 @@ contract("Referal-Tarif", function (/* accounts */) {
     const tarif = TarifData.fromPack((await referal.pTarifs(m1Acc)).tarif)
     const usage = TarifUsage.fromPack((await referal.users(m1Acc)).partnerTarifUsage)
 
-    console.log({tarif, usage})
+    console.log({ tarif, usage })
 
     await buyTarif(maxClientTarif(), m1Acc)
     await span49h();
 
     await buyTarif(partnerTarifs[2], m1Acc);
-  })  
+  })
 })
 
 
