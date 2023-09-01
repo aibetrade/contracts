@@ -9,6 +9,8 @@ import "./User.sol";
 contract Referal is OnlyOwner {
     ERC20Token public erc20;
 
+    UsersStore public usersStore;
+
     address public cWallet;
     function setCWallet(address _cWallet) public onlyOwner {
         require(_cWallet != address(0));
@@ -21,12 +23,15 @@ contract Referal is OnlyOwner {
         mWallet = _mWallet;
     }
 
-    constructor(address _erc20, address _cWallet, uint8 _qBonus, address _qWallet, address _mWallet) {
+    constructor(address _erc20, address _usersStoreAddress, address _cWallet, uint8 _qBonus, address _qWallet, address _mWallet) {
         erc20 = ERC20Token(_erc20);
         setCWallet(_cWallet);        
         setQBonus(_qBonus);
         setQWallet(_qWallet);
         setMWallet(_mWallet);
+
+        usersStore = UsersStore(_usersStoreAddress);
+        // address _usersStoreAddress
     }
 
     mapping(uint32 => uint8) public inviteMatix;
@@ -39,16 +44,16 @@ contract Referal is OnlyOwner {
     function setInvitePercent(uint256 _pTarif, uint256 _cTarif, uint8 _percent) public onlyOwner {
         require(_percent < 101);
 
-        uint32 pTarifKey = TarifReaderLib.tarifKey(_pTarif);
-        uint32 cTarifKey = TarifReaderLib.tarifKey(_cTarif);
+        uint32 pTarifKey = TarifDataLib.tarifKey(_pTarif);
+        uint32 cTarifKey = TarifDataLib.tarifKey(_cTarif);
 
         uint32 key = pTarifKey | (cTarifKey << 16);
         inviteMatix[key] = _percent;
     }
 
     function getInvitePercent(uint256 _pTarif, uint256 _cTarif) public view returns(uint8) {
-        uint32 pTarifKey = TarifReaderLib.tarifKey(_pTarif);
-        uint32 cTarifKey = TarifReaderLib.tarifKey(_cTarif);
+        uint32 pTarifKey = TarifDataLib.tarifKey(_pTarif);
+        uint32 cTarifKey = TarifDataLib.tarifKey(_cTarif);
 
         uint32 key = pTarifKey | (cTarifKey << 16);
         return inviteMatix[key];
@@ -85,45 +90,50 @@ contract Referal is OnlyOwner {
     */
     function makePayment(address _to, uint32 _cent) internal {
         erc20.transfer(_to, centToErc20(_cent));
-        users[_to].payHistory.push(PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
+        // {timestamp: block.timestamp, cents: _cent, from: msg.sender}
+        // UserStruct memory ss = usersStore.getUser(_to);
+        // ss.payHistory.push(PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
+        usersStore.addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
     }
 
-    // --- is/has section
-    function hasActiveMaxClientTarif(address user) public view returns (bool) {
-        return isClientTarifActive(user) && clientTarifs.isLast(cTarifs[user].tarif);
-    }
+    // // --- is/has section
+    // function hasActiveMaxClientTarif(address user) public view returns (bool) {
+    //     return usersStore.isClientTarifActive(user) && usersStore.clientTarifs.isLast(usersStore.cTarifs(user).tarif);
+    // }
 
-    function isPartnerActive(address _partner) public view returns(bool){
-        return hasActiveMaxClientTarif(_partner) && isPartnerTarifActive(_partner);
-    }
+    // function isPartnerActive(address _partner) public view returns(bool){
+    //     return hasActiveMaxClientTarif(_partner) && usersStore.isPartnerTarifActive(_partner);
+    // }
 
-    function isPartnerFullfilled(address _partner) public view returns (bool) {
-        return getFilled(users[_partner].partnerTarifUsage) >= TarifReaderLib.getFullNum(pTarifs[_partner].tarif);
-    }
+    // function isPartnerFullfilled(address _partner) public view returns (bool) {
+    //     return TarifUsageLib.getFilled(usersStore.users[_partner].partnerTarifUsage) >= TarifDataLib.getFullNum(usersStore.pTarifs[_partner].tarif);
+    // }
 
     // --- Rejectable section
     // Always reject only last buy (in history)
     function reject() public {
-        BuyHistoryRec memory bhr = users[msg.sender].buyHistory[users[msg.sender].buyHistory.length - 1];
+        BuyHistoryRec memory bhr = usersStore.getLastPay(msg.sender);
 
-        require(!TarifReaderLib.getIsRejected(bhr.tarif) 
+        require(!TarifDataLib.getIsRejected(bhr.tarif) 
             && block.timestamp - bhr.timestamp <= 48 * 3600);
         
-        uint16 price = TarifReaderLib.getPrice(bhr.tarif);
+        uint16 price = TarifDataLib.getPrice(bhr.tarif);
         uint16 count = bhr.count;
         erc20.transfer(bhr.from, centToErc20(price * 100 * count));
 
-        rejectBuy(users[msg.sender].buyHistory.length - 1);
+        usersStore.rejectBuy(msg.sender);
     }
 
     function takeComsa(address _client, uint256 _buyIndex) public {
-        require(!TarifReaderLib.getIsRejected(users[_client].buyHistory[_buyIndex].tarif) 
-            && !TarifReaderLib.getIsComsaTaken(users[_client].buyHistory[_buyIndex].tarif)
-            && block.timestamp - users[_client].buyHistory[_buyIndex].timestamp > 48 * 3600);
+        require(usersStore.isPayFixed(_client, _buyIndex));
+        //  !TarifDataLib.getIsRejected(usersStore.users[_client].buyHistory[_buyIndex].tarif) 
+        //     && !TarifDataLib.getIsComsaTaken(usersStore.users[_client].buyHistory[_buyIndex].tarif)
+        //     && block.timestamp - usersStore.users[_client].buyHistory[_buyIndex].timestamp > 48 * 3600);
 
-        uint256 tar = users[_client].buyHistory[_buyIndex].tarif;
+        // uint256 tar = usersStore.users[_client].buyHistory[_buyIndex].tarif;
+        uint256 tar = usersStore.getPayTarif(_client, _buyIndex);
 
-        if (TarifReaderLib.tarifKey(tar) == REGISTRATION_KEY){
+        if (TarifDataLib.tarifKey(tar) == REGISTRATION_KEY){
         }
 
         // else if (isPartner(tar)){
@@ -134,47 +144,48 @@ contract Referal is OnlyOwner {
             clientScheme(tar, _client);
         }
 
-        users[_client].buyHistory[_buyIndex].tarif = setComsaTaken(tar);
+        usersStore.setComsaTaken(_client, _buyIndex); //users[_client].buyHistory[_buyIndex].tarif = TarifDataLib.setComsaTaken(tar);
     }
 
     function freezeMoney(uint32 dollar) private{
-        require(block.timestamp - users[msg.sender].lastBuyAt > 48 * 3600);
+        require(usersStore.canFreezeMoney(msg.sender));
         erc20.transferFrom(msg.sender, address(this), centToErc20(dollar * 100));
-        users[msg.sender].lastBuyAt = block.timestamp;
+        usersStore.setLastBuyTime(msg.sender, block.timestamp);
     }
 
     // --- Payment schemes section
     function clientScheme(uint256 _tarif, address _client) internal {
-        if (users[_client].mentor == cWallet) {
-            makePayment(cWallet, TarifReaderLib.getPrice(_tarif) * 100);
+        address mentor = usersStore.getMentor(_client);
+
+        if (mentor == cWallet) {
+            makePayment(cWallet, TarifDataLib.getPrice(_tarif) * 100);
             return;
         }
 
-        address mentor = users[_client].mentor;
-        uint16 count = isPartner(_tarif) ? getExtLevel(users[_client].partnerTarifUsage) : 1;
-        uint32 basePriceCent = count * TarifReaderLib.getPrice(_tarif) * 100;
+        uint16 count = TarifDataLib.isPartner(_tarif) ? TarifUsageLib.getExtLevel(usersStore.getUsage(_client)) : 1;
+        uint32 basePriceCent = count * TarifDataLib.getPrice(_tarif) * 100;
         uint32 curPriceCent = basePriceCent;
-        users[mentor].partnerTarifUsage = useFill(users[mentor].partnerTarifUsage);
+        usersStore.setUsage(mentor, TarifUsageLib.useFill(usersStore.getUsage(mentor)));
         
 
         // Invite bonus processing
-        if (isPartnerActive(mentor)){
+        if (usersStore.isPartnerActive(mentor)){
             uint8 invitePercent;
             bool takeInviteBonus = false;
-            if (isPartner(_tarif)){
-                if (!pTarifs[_client].gotInviteBonus){
-                    pTarifs[_client].gotInviteBonus = true;
+            if (TarifDataLib.isPartner(_tarif)){
+                if (!usersStore.hasPInviteBonus(_client)){
+                    usersStore.givePInviteBonus(_client);
                     takeInviteBonus = true;
                 }
             }
             else {
-                if (!cTarifs[_client].gotInviteBonus){
-                    cTarifs[_client].gotInviteBonus = true;
+                if (!usersStore.hasCInviteBonus(_client)){
+                    usersStore.giveCInviteBonus(_client);
                     takeInviteBonus = true;
                 }                 
             }
             if (takeInviteBonus){
-                invitePercent = getInvitePercent(pTarifs[mentor].tarif, _tarif);
+                invitePercent = getInvitePercent(usersStore.pTarif(mentor), _tarif);
                 require(invitePercent > 0);
                 makePayment(mentor, invitePercent * basePriceCent / 100);
                 curPriceCent -= invitePercent * basePriceCent / 100;
@@ -193,15 +204,15 @@ contract Referal is OnlyOwner {
         // --- Matrix bonus get first available person
         {
             address mbMen = mentor;
-            while (mbMen != address(0) && mbMen != cWallet && !(isPartnerActive(mbMen) && (mbMen == mentor  || TarifReaderLib.hasCompress(pTarifs[mbMen].tarif)) && hasSlot(pTarifs[mbMen].tarif, users[mbMen].partnerTarifUsage))){
-                mbMen = users[mbMen].mentor;
+            while (mbMen != address(0) && mbMen != cWallet && !(usersStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersStore.hasCompress(mbMen)) && usersStore.hasSlot(mbMen))){
+                mbMen = usersStore.getMentor(mbMen);
             }
 
             if (mbMen != address(0) && mbMen != cWallet) {
-            // if (isPartnerActive(mentor) && hasSlot(pTarifs[mentor].tarif, users[mentor].partnerTarifUsage)){
-                uint32 matrixCent = TarifReaderLib.getMatrixBonus(pTarifs[mbMen].tarif) * 100;
-                makePayment(mbMen, matrixCent);
-                users[mbMen].partnerTarifUsage = useSlot(users[mbMen].partnerTarifUsage);
+            // if (isPartnerActive(mentor) && hasSlot(usersStore.pTarifs[mentor].tarif, usersStore.users[mentor].partnerTarifUsage)){
+                uint32 matrixCent = TarifDataLib.getMatrixBonus(usersStore.pTarif(mbMen)) * 100;
+                makePayment(mbMen, matrixCent);                
+                usersStore.useSlot(mbMen);
                 curPriceCent -= matrixCent;
             }
         }
@@ -211,13 +222,13 @@ contract Referal is OnlyOwner {
         // LV logic
         for (uint16 i = 0; i < 4; i++){
             // MC logic
-            uint256 pt = pTarifs[mentor].tarif;
-            uint64 ptu = users[mentor].partnerTarifUsage;
+            uint256 pt = usersStore.pTarif(mentor);
+            // uint64 ptu = usersStore.getUsage(mentor);
 
-            while (mentor != address(0) && mentor != cWallet && !(TarifReaderLib.getLV(pt) > i && isPartnerActive(mentor) && hasLVSlot(pt, ptu) )){
-                mentor = users[mentor].mentor;
-                pt = pTarifs[mentor].tarif;
-                ptu = users[mentor].partnerTarifUsage;
+            while (mentor != address(0) && mentor != cWallet && !(TarifDataLib.getLV(pt) > i && usersStore.isPartnerActive(mentor) && usersStore.hasLVSlot(mentor) )){
+                mentor = usersStore.getMentor(mentor);
+                pt = usersStore.pTarif(mentor);
+                // ptu = usersStore.users[mentor].partnerTarifUsage;
             }
 
             if (mentor == cWallet || mentor == address(0)){
@@ -225,9 +236,9 @@ contract Referal is OnlyOwner {
             }
             else{
                 makePayment(mentor, lvCent);
-                users[mentor].partnerTarifUsage = useLVSlot(users[mentor].partnerTarifUsage);
+                usersStore.useLVSlot(mentor);
                 curPriceCent -= lvCent;
-                mentor = users[mentor].mentor;
+                mentor = usersStore.getMentor(mentor);
             }
         }
 
@@ -243,35 +254,34 @@ contract Referal is OnlyOwner {
     // --- Shop section (buy this, buy that)
 
     function regitsterPartner() public {
-        require(hasActiveMaxClientTarif(msg.sender) && !users[msg.sender].registered); // , "Not MaxCli or already reg"        
+        require(usersStore.canRegister(msg.sender));
         
         freezeMoney(registerPrice);
 
-        newPartnerTarif(REGISTRATION_KEY, 1);
+        usersStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1);
 
-        users[msg.sender].registered = true;
+        usersStore.register(msg.sender);
     }
 
     function buyClientTarif(uint256 _tarif) public {
-        require(clientTarifs.exists(_tarif) && users[msg.sender].mentor != address(0)); // , "NoMen or NoExTar"
-        // require(clientTarifs.exists(_tarif), "Mentor or non exists tarif");
+        require(usersStore.cTarifExists(_tarif) && usersStore.getMentor(msg.sender) != address(0)); // , "NoMen or NoExTar"
 
-        freezeMoney(TarifReaderLib.getPrice(_tarif));
+        freezeMoney(TarifDataLib.getPrice(_tarif));
 
-        newClientTarif(_tarif);
+        usersStore.newClientTarif(msg.sender, _tarif);
     }
 
     function buyPartnerTarif(uint256 _tarif) public {
-        require(users[msg.sender].registered && hasActiveMaxClientTarif(msg.sender) && isPartnerFullfilled(msg.sender));
+        require(usersStore.canBuyPTarif(msg.sender));
 
         uint16 buyCount = 1;
         uint16 ext = 1;
 
-        if (isPartnerTarifActive(msg.sender)){
-            require(isT1BetterOrSameT2(_tarif, pTarifs[msg.sender].tarif));
+        if (usersStore.isPartnerTarifActive(msg.sender)){
+            require(usersStore.isT1BetterOrSameT2(_tarif, usersStore.pTarif(msg.sender)));
 
-            buyCount = getExtLevel(users[msg.sender].partnerTarifUsage);
-            if (TarifReaderLib.tarifKey(pTarifs[msg.sender].tarif) == TarifReaderLib.tarifKey(_tarif)){
+            buyCount = TarifUsageLib.getExtLevel(usersStore.getUsage(msg.sender));
+            if (TarifDataLib.tarifKey(usersStore.pTarif(msg.sender)) == TarifDataLib.tarifKey(_tarif)){
                 ext = buyCount + 1;
                 buyCount = 1;                
             }
@@ -279,11 +289,11 @@ contract Referal is OnlyOwner {
                 ext = buyCount;
         }
 
-        freezeMoney(TarifReaderLib.getPrice(_tarif) * buyCount);
+        freezeMoney(TarifDataLib.getPrice(_tarif) * buyCount);
 
-        newPartnerTarif(_tarif, buyCount);
+        usersStore.newPartnerTarif(msg.sender, _tarif, buyCount);
 
-        uint64 usage = users[msg.sender].partnerTarifUsage;
-        users[msg.sender].partnerTarifUsage = buildUsage(getUsedSlots(users[msg.sender].partnerTarifUsage), getUsedLVSlots(usage), ext, 0);
+        uint64 usage = usersStore.getUsage(msg.sender);
+        usersStore.setUsage(msg.sender, TarifUsageLib.buildUsage(TarifUsageLib.getUsedSlots(usage), TarifUsageLib.getUsedLVSlots(usage), ext, 0));
     }
 }

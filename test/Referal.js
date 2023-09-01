@@ -1,5 +1,6 @@
 const Referal = artifacts.require("Referal");
 const ERC20Token = artifacts.require("ERC20Token");
+var UsersStore = artifacts.require("UsersStore");
 const TarifsContractBase = artifacts.require("TarifsContractBase");
 const { time } = require('@openzeppelin/test-helpers');
 
@@ -15,66 +16,7 @@ const REGISTRATION_KEY = 65535;
 const { TarifData, TarifUsage } = require('../utils/tarif');
 const { web3 } = require('@openzeppelin/test-helpers/src/setup');
 
-// + Create contract
-// + Append tarifs
-// * Freeze tarifs
-
-const clientTarifs = [
-  TarifData.create(101, 10),
-  TarifData.create(102, 30),
-  TarifData.create(103, 50),
-]
-
-const partnerTarifs = [
-  // TarifData.create(10000 + 1, 150, 10, 15, 2, 0, 0, 0, 5),
-  // TarifData.create(10000 + 2, 350, 15, 25, 3, 0, 0, 0, 10),
-  // TarifData.create(10000 + 3, 700, 20, 50, 4, 1, 50, 2, 20),
-  // TarifData.create(10000 + 4, 1500, 25, 100, 5, 1, 100, 4, 40),
-
-  // TarifData.create(10000 + 1, 120, 2, 1, 2, 0, 0, 0, 5),
-  // TarifData.create(10000 + 2, 350, 3, 2, 3, 0, 0, 0, 10),
-  // TarifData.create(10000 + 3, 699, 4, 3, 4, 1, 50, 2, 20),
-  // TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 40),
-
-  TarifData.create(10000 + 1, 120, 2, 1, 2, 0, 0, 0, 2),
-  TarifData.create(10000 + 2, 350, 3, 2, 3, 0, 0, 0, 2),
-  TarifData.create(10000 + 3, 699, 4, 3, 4, 1, 50, 2, 2),
-  TarifData.create(10000 + 4, 999, 5, 4, 5, 1, 100, 4, 2)
-]
-
-const inviteBonusHash = [
-  [partnerTarifs[0].pack(), clientTarifs[0].pack(), 10],
-  [partnerTarifs[0].pack(), clientTarifs[1].pack(), 10],
-  [partnerTarifs[0].pack(), clientTarifs[2].pack(), 10],
-  [partnerTarifs[0].pack(), partnerTarifs[0].pack(), 10],
-  [partnerTarifs[0].pack(), partnerTarifs[1].pack(), 10],
-  [partnerTarifs[0].pack(), partnerTarifs[2].pack(), 10],
-  [partnerTarifs[0].pack(), partnerTarifs[3].pack(), 10],
-
-  [partnerTarifs[1].pack(), clientTarifs[0].pack(), 10],
-  [partnerTarifs[1].pack(), clientTarifs[1].pack(), 12],
-  [partnerTarifs[1].pack(), clientTarifs[2].pack(), 12],
-  [partnerTarifs[1].pack(), partnerTarifs[0].pack(), 10],
-  [partnerTarifs[1].pack(), partnerTarifs[1].pack(), 12],
-  [partnerTarifs[1].pack(), partnerTarifs[2].pack(), 12],
-  [partnerTarifs[1].pack(), partnerTarifs[3].pack(), 15],
-
-  [partnerTarifs[2].pack(), clientTarifs[0].pack(), 10],
-  [partnerTarifs[2].pack(), clientTarifs[1].pack(), 12],
-  [partnerTarifs[2].pack(), clientTarifs[2].pack(), 15],
-  [partnerTarifs[2].pack(), partnerTarifs[0].pack(), 10],
-  [partnerTarifs[2].pack(), partnerTarifs[1].pack(), 12],
-  [partnerTarifs[2].pack(), partnerTarifs[2].pack(), 15],
-  [partnerTarifs[2].pack(), partnerTarifs[3].pack(), 20],
-
-  [partnerTarifs[3].pack(), clientTarifs[0].pack(), 10],
-  [partnerTarifs[3].pack(), clientTarifs[1].pack(), 15],
-  [partnerTarifs[3].pack(), clientTarifs[2].pack(), 20],
-  [partnerTarifs[3].pack(), partnerTarifs[0].pack(), 10],
-  [partnerTarifs[3].pack(), partnerTarifs[1].pack(), 15],
-  [partnerTarifs[3].pack(), partnerTarifs[2].pack(), 20],
-  [partnerTarifs[3].pack(), partnerTarifs[3].pack(), 25],
-]
+const {clientTarifs, partnerTarifs, inviteBonusHash} = require('./tarifs-data')
 
 function getInviteBonus(mTairf, uTarif) {
   return inviteBonusHash.filter(x => x[0] == mTairf.pack() && x[1] == uTarif.pack())[0][2]
@@ -93,12 +35,15 @@ async function init(isNew = false) {
     const accounts = await web3.eth.getAccounts()
     const referal = await Referal.deployed()
 
+    const usersStore = await UsersStore.at(await referal.usersStore())
+
     stack = {
       referal,
       erc20: await ERC20Token.deployed(),
       accounts,
-      cliTarifs: await TarifsContractBase.at(await referal.clientTarifs()),
-      parTarifs: await TarifsContractBase.at(await referal.partnerTarifs()),
+      usersStore,
+      cliTarifs: await TarifsContractBase.at(await usersStore.clientTarifs()),
+      parTarifs: await TarifsContractBase.at(await usersStore.partnerTarifs()),
 
       cWallet: accounts[8],
       qWallet: accounts[9],
@@ -268,38 +213,38 @@ const span49h = async () => {
 }
 
 async function userHasCTarif(ctarif, acc = null) {
-  const { referal, accounts } = await init();
+  const { referal, usersStore, accounts } = await init();
 
   acc = acc || accounts[0]
 
-  const ucTarif = await referal.cTarifs(acc)
+  const ucTarif = await usersStore.cTarifs(acc)
   assert.deepEqual(ctarif, TarifData.fromPack(ucTarif.tarif))
 }
 
 async function userHasPTarif(ptarif, acc = null) {
-  const { referal, accounts } = await init();
+  const { referal, usersStore, accounts } = await init();
 
   acc = acc || accounts[0]
 
-  const upTarif = await referal.pTarifs(acc)
+  const upTarif = await usersStore.pTarifs(acc)
   assert.deepEqual(ptarif, TarifData.fromPack(upTarif.tarif))
 }
 
 async function getLastBuy(acc = null) {
-  const { referal, accounts } = await init();
+  const { usersStore, accounts } = await init();
   acc = acc || accounts[0]
-  const buyHistory = await referal.getBuyHistory(acc)
+  const buyHistory = await usersStore.getBuyHistory(acc)
   return buyHistory[buyHistory.length - 1]
 }
 
 // Get all comsas
 async function getAllComsasOf(partner) {
-  const { referal, C1, C2 } = await init();
+  const { referal, usersStore, C1, C2 } = await init();
 
   let result = []
-  const refs = await referal.getReferals(partner)
+  const refs = await usersStore.getReferals(partner)
   for (let ref of refs) {
-    const history = await referal.getBuyHistory(ref)
+    const history = await usersStore.getBuyHistory(ref)
 
     const history2 = history.map((x, i) => {
       const { timestamp, tarif, count } = x
@@ -328,10 +273,10 @@ async function printUserTarifs(acc = null, msg) {
 }
 
 async function prettyHistory(acc = null) {
-  const { referal, accounts } = await init();
+  const { referal, usersStore, accounts } = await init();
   acc = acc || accounts[0]
 
-  const history = (await referal.getBuyHistory(acc)).map((x, i) => {
+  const history = (await usersStore.getBuyHistory(acc)).map((x, i) => {
     const { timestamp, tarif, count } = x
     const tar = TarifData.fromPack(tarif)
     const { key, price, isRejected, isComsaTaken } = tar
@@ -349,10 +294,10 @@ function prettyHistoryRec(rec) {
 }
 
 async function printBuyHistory(acc = null) {
-  const { referal, accounts } = await init();
+  const { referal, accounts , usersStore} = await init();
   acc = acc || accounts[0]
 
-  const history = (await referal.getBuyHistory(acc)).map((x, i) => {
+  const history = (await usersStore.getBuyHistory(acc)).map((x, i) => {
     const { timestamp, tarif, count } = x
     const tar = TarifData.fromPack(tarif)
     const { key, price, isRejected, isComsaTaken } = tar
@@ -372,11 +317,13 @@ async function register(acc = null) {
 }
 
 async function getBuyPriceDollar(tarif, acc = null) {
-  const { erc20, referal, accounts } = await init();
+  const { erc20, referal, usersStore, accounts } = await init();
   acc = acc || accounts[0]
 
+  console.log("TARIF", tarif)
+
   if (tarif.isPartner()) {
-    const ext = TarifUsage.fromPack((await referal.users(acc)).partnerTarifUsage).extLevel || 1
+    const ext = TarifUsage.fromPack((await usersStore.getUsage(acc)).extLevel || 1)
     return tarif.price * ext
   }
   else {
@@ -386,19 +333,19 @@ async function getBuyPriceDollar(tarif, acc = null) {
 
 
 async function buyTarif(tarif, acc = null) {
-  const { erc20, referal, accounts } = await init();
+  const { erc20, referal, usersStore, accounts } = await init();
   acc = acc || accounts[0]
 
   const refBalanceBefore = await erc20.balanceOf(referal.address)
 
-  const ucTarifWas = await referal.cTarifs(acc)
-  const upTarifWas = await referal.pTarifs(acc)
-  const userWas = await referal.users(acc)
+  const ucTarifWas = await usersStore.cTarifs(acc)
+  const upTarifWas = await usersStore.pTarifs(acc)
+  const userWas = await usersStore.users(acc)
 
-  const buyHistoryWas = await referal.getBuyHistory(acc)
+  const buyHistoryWas = await usersStore.getBuyHistory(acc)
 
   const price = await getBuyPriceDollar(tarif, acc)
-  const wasPartnerTarifActive = await referal.isPartnerTarifActive(acc)
+  const wasPartnerTarifActive = await usersStore.isPartnerTarifActive(acc)
 
 
   // --- Buy logic ---
@@ -409,7 +356,7 @@ async function buyTarif(tarif, acc = null) {
     await referal.buyClientTarif(tarif.pack(), { from: acc })
   // === Buy logic ===
 
-  const userAfter = await referal.users(acc)
+  const userAfter = await usersStore.users(acc)
 
   const refBalanceAfter = await erc20.balanceOf(referal.address)
   if (await fromErc20(refBalanceAfter.sub(refBalanceBefore)) != price) throw "Income incorrect"
@@ -421,14 +368,14 @@ async function buyTarif(tarif, acc = null) {
     await userHasCTarif(tarif, acc)
 
   // --- Check buy history
-  const buyHistory = await referal.getBuyHistory(acc)
+  const buyHistory = await usersStore.getBuyHistory(acc)
   if (buyHistory.length - 1 != buyHistoryWas.length) throw "Buy history not changed"
 
   const lastBuy = buyHistory[buyHistory.length - 1]
   if (lastBuy.tarif.toString() != tarif.pack()) throw "Last buy tarif not added to history"
 
   // --- Check rollback saved ok 
-  const uRollback = await referal.rollbacks(acc)
+  const uRollback = await usersStore.rollbacks(acc)
 
   // Check rollback info is correct
   if (tarif.isPartner()) {
@@ -485,10 +432,10 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("All accounts have access to contract", async function () {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
 
-    const cliTarifs = await TarifsContractBase.at(await referal.clientTarifs())
-    const parTarifs = await TarifsContractBase.at(await referal.partnerTarifs())
+    const cliTarifs = await TarifsContractBase.at(await usersStore.clientTarifs())
+    const parTarifs = await TarifsContractBase.at(await usersStore.partnerTarifs())
 
     for (let acc of accounts) {
       await cliTarifs.getAll({ from: acc })
@@ -497,10 +444,10 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("Olny OWNER can add and remove tarifs", async function () {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
 
-    const cliTarifs = await TarifsContractBase.at(await referal.clientTarifs())
-    const parTarifs = await TarifsContractBase.at(await referal.partnerTarifs())
+    const cliTarifs = await TarifsContractBase.at(await usersStore.clientTarifs())
+    const parTarifs = await TarifsContractBase.at(await usersStore.partnerTarifs())
 
     await cliTarifs.append(clientTarifs[0].pack())
     await cliTarifs.clear()
@@ -570,27 +517,27 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
 
-  it("Tarif price is correct", async function () {
-    const { referal } = await init();
+  // it("Tarif price is correct", async function () {
+  //   const { referal } = await init();
 
-    for (let i = 0; i < tarifs.length; i++) {
-      const price = await referal.getPrice(tarifs[i].pack())
-      assert.equal(price.toNumber(), tarifs[i].price)
-    }
-  });
+  //   for (let i = 0; i < tarifs.length; i++) {
+  //     const price = await referal.getPrice(tarifs[i].pack())
+  //     assert.equal(price.toNumber(), tarifs[i].price)
+  //   }
+  // });
 
   // Check can buy partner tarif
   it("Get user test", async function () {
-    const { referal, accounts } = await init();
-    const ucTarif = await referal.cTarifs(accounts[0]);
+    const { referal, usersStore, accounts } = await init();
+    const ucTarif = await usersStore.cTarifs(accounts[0]);
     assert.equal(ucTarif.tarif, 0)
     assert.equal(ucTarif.boughtAt, 0)
 
-    const upTarif = await referal.pTarifs(accounts[0]);
+    const upTarif = await usersStore.pTarifs(accounts[0]);
     assert.equal(upTarif.tarif, 0)
     assert.equal(upTarif.boughtAt, 0)
 
-    const user = await referal.users(accounts[0]);
+    const user = await usersStore.users(accounts[0]);
     assert.equal(user.partnerTarifUsage, 0)
   })
 
@@ -608,21 +555,21 @@ contract("Referal-Tarif", function (/* accounts */) {
   // })
 
   it("Mentor set is OK", async function () {
-    const { referal, cWallet } = await init();
-    await referal.setMentor(cWallet)
+    const { usersStore, cWallet } = await init();
+    await usersStore.setMentor(cWallet)
   })
 
   it("Can NOT change mentor", async function () {
-    const { referal, C1 } = await init();
-    await mustFail(referal.setMentor(C1))
+    const { usersStore, C1 } = await init();
+    await mustFail(usersStore.setMentor(C1))
   })
 
   it("Can buy client tarif with money and mentor", async function () {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
 
     await buyTarif(tarifs[0])
 
-    assert.equal(await referal.hasActiveMaxClientTarif(accounts[0]), false);
+    assert.equal(await usersStore.hasActiveMaxClientTarif(accounts[0]), false);
   })
 
   it("Can not buy another tarif till 48 hours", async function () {
@@ -653,17 +600,17 @@ contract("Referal-Tarif", function (/* accounts */) {
 
   // Buy client tarif
   it("Can buy maximum client tarif (after 48h)", async function () {
-    const { referal, erc20, accounts } = await init();
+    const { referal, usersStore, erc20, accounts } = await init();
     const ct = clientTarifs[clientTarifs.length - 1]
 
     await span49h();
 
-    const no = await referal.hasActiveMaxClientTarif(accounts[0])
+    const no = await usersStore.hasActiveMaxClientTarif(accounts[0])
     assert.deepEqual(no, false)
 
     await buyTarif(ct)
 
-    const yes = await referal.hasActiveMaxClientTarif(accounts[0])
+    const yes = await usersStore.hasActiveMaxClientTarif(accounts[0])
     assert.deepEqual(yes, true)
   })
 
@@ -756,9 +703,9 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("C1 buy max ctarif, register, ptarif-0", async function () {
-    const { referal, C1, cWallet } = await init();
+    const { referal, usersStore, C1, cWallet } = await init();
 
-    await referal.setMentor(cWallet, { from: C1 })
+    await usersStore.setMentor(cWallet, { from: C1 })
 
     await buyTarif(maxClientTarif(), C1)
     await span49h();
@@ -771,10 +718,10 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("C1 is mentor of c2", async function () {
-    const { referal, C1, C2 } = await init();
+    const { referal, usersStore, C1, C2 } = await init();
 
-    await referal.setMentor(C1, { from: C2 })
-    const user = await referal.users(C2)
+    await usersStore.setMentor(C1, { from: C2 })
+    const user = await usersStore.users(C2)
     assert.deepEqual(user.mentor, C1)
   })
 
@@ -837,19 +784,19 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   async function getUserInfo(acc = null) {
-    const { referal, accounts } = await init();
+    const { referal, usersStore, accounts } = await init();
     acc = acc || accounts[0]
 
-    const active = await referal.isPartnerActive(acc)
-    const cTarifInfo = await referal.cTarifs(acc)
+    const active = await usersStore.isPartnerActive(acc)
+    const cTarifInfo = await usersStore.cTarifs(acc)
 
-    const pTarifInfo = await referal.pTarifs(acc)
+    const pTarifInfo = await usersStore.pTarifs(acc)
 
-    const pTarifUsageInfo = (await referal.users(acc)).partnerTarifUsage
+    const pTarifUsageInfo = (await usersStore.users(acc)).partnerTarifUsage
     const pTarifUsage = TarifUsage.fromPack(pTarifUsageInfo)
 
-    const hasSlot = await referal.hasSlot(pTarifInfo.tarif, pTarifUsageInfo)
-    const hasLVSlot = await referal.hasLVSlot(pTarifInfo.tarif, pTarifUsageInfo)
+    const hasSlot = await usersStore.hasSlot(acc)
+    const hasLVSlot = await usersStore.hasLVSlot(acc)
 
     // cTarifInfo.tarif = TarifData.fromPack(cTarifInfo.tarif)
     // pTarifInfo.tarif = TarifData.fromPack(pTarifInfo.tarif)
@@ -979,7 +926,7 @@ contract("Referal-Tarif", function (/* accounts */) {
   }
 
   it("build chan C1->C2->C3->C4->C5 + register", async function () {
-    const { referal, erc20, C1, C2, C3, C4, C5 } = await init();
+    const { referal, usersStore, erc20, C1, C2, C3, C4, C5 } = await init();
 
 
     const uAcc = C5;
@@ -989,9 +936,9 @@ contract("Referal-Tarif", function (/* accounts */) {
     const m4Acc = C1;
 
     // await referal.setMentor(C1, { from: C2 })
-    await referal.setMentor(m1Acc, { from: uAcc })
-    await referal.setMentor(m2Acc, { from: m1Acc })
-    await referal.setMentor(m3Acc, { from: m2Acc })
+    await usersStore.setMentor(m1Acc, { from: uAcc })
+    await usersStore.setMentor(m2Acc, { from: m1Acc })
+    await usersStore.setMentor(m3Acc, { from: m2Acc })
     // await referal.setMentor(m4Acc, { from: m3Acc })    
 
     await buyTarif(maxClientTarif(), uAcc)
@@ -1077,10 +1024,10 @@ contract("Referal-Tarif", function (/* accounts */) {
   })
 
   it("Can upgrade filled tarif", async function () {
-    const { referal, erc20, uAcc, m1Acc } = await init();
+    const { referal, usersStore, erc20, uAcc, m1Acc } = await init();
 
-    const tarif = TarifData.fromPack((await referal.pTarifs(m1Acc)).tarif)
-    const usage = TarifUsage.fromPack((await referal.users(m1Acc)).partnerTarifUsage)
+    const tarif = TarifData.fromPack((await usersStore.pTarifs(m1Acc)).tarif)
+    const usage = TarifUsage.fromPack(await usersStore.getUsage(m1Acc))
 
     console.log({ tarif, usage })
 

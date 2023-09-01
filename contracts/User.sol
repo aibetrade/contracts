@@ -51,17 +51,43 @@ contract UsersStore is TarifsContract, OnlyOwner {
 
     address[] public registeredUsers;
 
-    function registeredUsersCount() public view returns (uint256) {
-        return registeredUsers.length;
+    // function getUser(address acc) public view returns (UserStruct memory){
+    //     return users[acc];
+    // }
+
+    function getLastPay(
+        address acc
+    ) public view returns (BuyHistoryRec memory) {
+        return users[acc].buyHistory[users[acc].buyHistory.length - 1];
     }
 
-    function setMentor(address mentor) public {
-        require(mentor != address(0));
-        require(users[msg.sender].mentor == address(0));
+    function addUserPay(
+        address acc,
+        PayHistoryRec memory rec
+    ) public onlyOwner {
+        users[acc].payHistory.push(rec);
+    }
 
-        registeredUsers.push(msg.sender);
-        users[msg.sender].mentor = mentor;
-        users[mentor].referals.push(msg.sender);
+    // --- is/has section
+    function hasActiveMaxClientTarif(address user) public view returns (bool) {
+        return
+            isClientTarifActive(user) &&
+            clientTarifs.isLast(cTarifs[user].tarif);
+    }
+
+    function isPartnerActive(address _partner) public view returns (bool) {
+        return
+            hasActiveMaxClientTarif(_partner) && isPartnerTarifActive(_partner);
+    }
+
+    function isPartnerFullfilled(address _partner) public view returns (bool) {
+        return
+            TarifUsageLib.getFilled(users[_partner].partnerTarifUsage) >=
+            TarifDataLib.getFullNum(pTarifs[_partner].tarif);
+    }
+
+    function registeredUsersCount() public view returns (uint256) {
+        return registeredUsers.length;
     }
 
     // --- User space
@@ -86,17 +112,17 @@ contract UsersStore is TarifsContract, OnlyOwner {
         return block.timestamp - pTarifs[_partner].boughtAt <= YEAR;
     }
 
-    function newClientTarif(uint256 _tarif) internal {
+    function newClientTarif(address _acc, uint256 _tarif) public onlyOwner {
         // uint256 tarif = clientTarifs.tarif(_key);
-        rollbacks[msg.sender].tarif = cTarifs[msg.sender].tarif;
-        rollbacks[msg.sender].date = cTarifs[msg.sender].boughtAt;
+        rollbacks[_acc].tarif = cTarifs[_acc].tarif;
+        rollbacks[_acc].date = cTarifs[_acc].boughtAt;
 
-        cTarifs[msg.sender].tarif = _tarif;
-        cTarifs[msg.sender].boughtAt = block.timestamp;
+        cTarifs[_acc].tarif = _tarif;
+        cTarifs[_acc].boughtAt = block.timestamp;
 
-        users[msg.sender].buyHistory.push(
+        users[_acc].buyHistory.push(
             BuyHistoryRec({
-                from: msg.sender,
+                from: _acc,
                 tarif: _tarif,
                 timestamp: block.timestamp,
                 count: 1
@@ -104,19 +130,19 @@ contract UsersStore is TarifsContract, OnlyOwner {
         );
     }
 
-    function newPartnerTarif(uint256 _tarif, uint16 _count) internal {
-        rollbacks[msg.sender].tarif = pTarifs[msg.sender].tarif;
-        rollbacks[msg.sender].date = pTarifs[msg.sender].boughtAt;
-        rollbacks[msg.sender].usage = users[msg.sender].partnerTarifUsage;
+    function newPartnerTarif(address _acc, uint256 _tarif, uint16 _count) public onlyOwner {
+        rollbacks[_acc].tarif = pTarifs[_acc].tarif;
+        rollbacks[_acc].date = pTarifs[_acc].boughtAt;
+        rollbacks[_acc].usage = users[_acc].partnerTarifUsage;
 
-        if (TarifReaderLib.tarifKey(_tarif) != REGISTRATION_KEY) {
-            pTarifs[msg.sender].tarif = _tarif;
-            pTarifs[msg.sender].boughtAt = block.timestamp;
+        if (TarifDataLib.tarifKey(_tarif) != REGISTRATION_KEY) {
+            pTarifs[_acc].tarif = _tarif;
+            pTarifs[_acc].boughtAt = block.timestamp;
         }
 
-        users[msg.sender].buyHistory.push(
+        users[_acc].buyHistory.push(
             BuyHistoryRec({
-                from: msg.sender,
+                from: _acc,
                 tarif: _tarif,
                 timestamp: block.timestamp,
                 count: _count
@@ -124,30 +150,157 @@ contract UsersStore is TarifsContract, OnlyOwner {
         );
     }
 
-    function rejectBuy(uint256 _buyIndex) internal {
-        uint256 tar = users[msg.sender].buyHistory[_buyIndex].tarif;
+    function rejectBuy(address acc) public onlyOwner {
+        uint256 tar = getLastPay(acc).tarif;
 
         // Reject registration
-        if (TarifReaderLib.tarifKey(tar) == REGISTRATION_KEY) {
-            users[msg.sender].registered = false;
+        if (TarifDataLib.tarifKey(tar) == REGISTRATION_KEY) {
+            users[acc].registered = false;
         }
         // Reject parent tarif
-        else if (isPartner(tar)) {
-            pTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
-            pTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
-            users[msg.sender].partnerTarifUsage = rollbacks[msg.sender].usage;
+        else if (TarifDataLib.isPartner(tar)) {
+            pTarifs[acc].tarif = rollbacks[acc].tarif;
+            pTarifs[acc].boughtAt = rollbacks[acc].date;
+            users[acc].partnerTarifUsage = rollbacks[acc].usage;
         }
         // Reject client tarif
         else {
-            cTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
-            cTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
+            cTarifs[acc].tarif = rollbacks[acc].tarif;
+            cTarifs[acc].boughtAt = rollbacks[acc].date;
         }
 
-        users[msg.sender].buyHistory[_buyIndex].tarif = setRejected(users[msg.sender].buyHistory[_buyIndex].tarif);
-        users[msg.sender].lastBuyAt = 0;
+        // users[acc].buyHistory[_buyIndex].tarif = TarifDataLib.setRejected(users[acc].buyHistory[_buyIndex].tarif);
+        uint256 _buyIndex = users[acc].buyHistory.length;
+        users[acc].buyHistory[_buyIndex].tarif = TarifDataLib.setRejected(
+            users[acc].buyHistory[_buyIndex].tarif
+        );
+        users[acc].lastBuyAt = 0;
+    }
+
+    function getPayTarif(
+        address _acc,
+        uint256 _buyIndex
+    ) public view returns (uint256) {
+        return users[_acc].buyHistory[_buyIndex].tarif;
+    }
+
+    function isPayFixed(
+        address _acc,
+        uint256 _buyIndex
+    ) public view returns (bool) {
+        return
+            !TarifDataLib.getIsRejected(
+                users[_acc].buyHistory[_buyIndex].tarif
+            ) &&
+            !TarifDataLib.getIsComsaTaken(
+                users[_acc].buyHistory[_buyIndex].tarif
+            ) &&
+            block.timestamp - users[_acc].buyHistory[_buyIndex].timestamp >
+            48 * 3600;
     }
 
     function getReferals(address user) public view returns (address[] memory) {
         return users[user].referals;
     }
+
+    function setComsaTaken(address _acc, uint256 _buyIndex) public onlyOwner {
+        users[_acc].buyHistory[_buyIndex].tarif = TarifDataLib.setComsaTaken(
+            users[_acc].buyHistory[_buyIndex].tarif
+        );
+    }
+
+    function canFreezeMoney(address _acc) public view returns (bool) {
+        return block.timestamp - users[_acc].lastBuyAt > 48 * 3600;
+    }
+
+    function setLastBuyTime(address _acc, uint256 _timestamp) public {
+        users[_acc].lastBuyAt = _timestamp;
+    }
+
+    function getMentor(address _acc) public view returns (address) {
+        return users[_acc].mentor;
+    }
+
+    function setMentor(address _mentor) public {
+        require(_mentor != address(0) && msg.sender != _mentor);
+        require(users[msg.sender].mentor == address(0));
+
+        registeredUsers.push(msg.sender);
+        users[msg.sender].mentor = _mentor;
+        users[_mentor].referals.push(msg.sender);
+    }
+
+
+    function getUsage(address _acc) public view returns (uint64){
+        return users[_acc].partnerTarifUsage;
+    }
+    
+    function setUsage(address _acc, uint64 _usage) public onlyOwner{
+        users[_acc].partnerTarifUsage = _usage;
+    }
+
+    function hasCInviteBonus(address _acc) public view returns(bool){
+        return cTarifs[_acc].gotInviteBonus;
+    }
+
+    function giveCInviteBonus(address _acc) public onlyOwner{
+        cTarifs[_acc].gotInviteBonus = true;
+    }
+
+    function hasPInviteBonus(address _acc) public view returns(bool){
+        return pTarifs[_acc].gotInviteBonus;
+    }
+
+    function givePInviteBonus(address _acc) public onlyOwner{
+        pTarifs[_acc].gotInviteBonus = true;
+    }
+
+    function cTarif(address _acc) public view returns(uint256){
+        return cTarifs[_acc].tarif;
+    }
+
+    function pTarif(address _acc) public view returns(uint256){
+        return pTarifs[_acc].tarif;
+    }
+
+    function hasCompress(address _acc) public view returns(bool){
+        return TarifDataLib.hasCompress(pTarifs[_acc].tarif);
+    }
+
+    function hasSlot(address _acc) public view returns(bool){
+        return TarifUsageLib.hasSlot(pTarifs[_acc].tarif, users[_acc].partnerTarifUsage);
+    }
+
+    function useSlot(address _acc) public onlyOwner {
+        users[_acc].partnerTarifUsage = TarifUsageLib.useSlot(users[_acc].partnerTarifUsage);
+    }    
+
+    function hasLVSlot(address _acc) public view returns(bool){
+        return TarifUsageLib.hasLVSlot(pTarifs[_acc].tarif, users[_acc].partnerTarifUsage);
+    }
+
+    function useLVSlot(address _acc) public onlyOwner {
+        users[_acc].partnerTarifUsage = TarifUsageLib.useLVSlot(users[_acc].partnerTarifUsage);
+    }    
+
+    function canRegister(address _acc) public view returns(bool){
+        return hasActiveMaxClientTarif(_acc) && !users[_acc].registered;
+    }
+
+    function register(address _acc) public onlyOwner {
+        users[_acc].registered = true;
+    }
+
+    function cTarifExists(uint256 _tarif) public view returns(bool){
+        return clientTarifs.exists(_tarif);
+    }
+
+    function pTarifExists(uint256 _tarif) public view returns(bool){
+        return partnerTarifs.exists(_tarif);
+    }
+            
+    function canBuyPTarif(address _acc) public view returns(bool){
+        return users[_acc].registered && hasActiveMaxClientTarif(_acc) && isPartnerFullfilled(_acc);
+    }
+
 }
