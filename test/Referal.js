@@ -30,6 +30,8 @@ function maxClientTarif() {
 
 let stack = null
 
+const conf = require("../migrations/conf.json")
+
 async function init(isNew = false) {
   if (isNew || !stack) {
     const accounts = await web3.eth.getAccounts()
@@ -38,6 +40,8 @@ async function init(isNew = false) {
     const usersStore = await UsersStore.at(await referal.usersStore())
 
     stack = {
+      ...conf,
+
       referal,
       erc20: await ERC20Token.deployed(),
       accounts,
@@ -45,9 +49,9 @@ async function init(isNew = false) {
       cliTarifs: await TarifsContractBase.at(await usersStore.clientTarifs()),
       parTarifs: await TarifsContractBase.at(await usersStore.partnerTarifs()),
 
-      cWallet: accounts[8],
-      qWallet: accounts[9],
-      mWallet: accounts[7],
+      // cWallet: accounts[8],
+      // qWallet: accounts[9],
+      // mWallet: accounts[7],
 
       C0: accounts[0],
       C1: accounts[1],

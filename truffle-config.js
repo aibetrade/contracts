@@ -1,13 +1,32 @@
-const Web3 = require("web3");
-const PrivateKeyProvider = require("truffle-privatekey-provider");
+require('dotenv').config()
+// const Web3 = require("web3");
+// const PrivateKeyProvider = require("truffle-privatekey-provider");
 const HDWalletProvider = require('@truffle/hdwallet-provider');
 
-const url = `https://eth.aibetradedev.ru:443/`
-const pk = '0x69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
+// const url = `https://eth.aibetradedev.ru:443/`
+// const pk = '0x69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
 
-const mnemonic = '69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
+// const mnemonic = '69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
 
-const web3 = new Web3.providers.HttpProvider('https://eth.aibetradedev.ru/');
+// const web3 = new Web3.providers.HttpProvider('https://eth.aibetradedev.ru/');
+
+function loadNet(name) {
+  const rpc = process.env[`NET_${name.toUpperCase()}_RPC`]
+  const key = process.env[`NET_${name.toUpperCase()}_KEY`]
+
+  const provider = new HDWalletProvider(key, rpc)
+  // const provider = () => new Web3(hdProvider)
+  return { provider, network_id: "*", }
+}
+
+// async function aaa() {
+//   const { provider } = loadNet('aibe2')
+//   const bb = await provider.eth.getBlock("latest")
+//   console.log(bb)
+// }
+
+// aaa()
+// return
 
 
 /**
@@ -81,19 +100,29 @@ module.exports = {
     //  port: 8545,            // Standard Ethereum port (default: none)
     //  network_id: "*",       // Any network (default: none)
     // },
-    aibe: {
-     provider: () => web3,
-    //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
-    //  port: 443,            // Standard Ethereum port (default: none)
-     network_id: "*",       // Any network (default: none)
-    },
+    // aibe: {
+    //   provider: () => web3,
+    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
+    //   //  port: 443,            // Standard Ethereum port (default: none)
+    //   network_id: "*",       // Any network (default: none)
+    // },
 
-    bsctest: {
-      provider: () => new HDWalletProvider(mnemonic, `https://data-seed-prebsc-1-s1.binance.org:8545/`),
-      //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
-      //  port: 443,            // Standard Ethereum port (default: none)
-       network_id: "*",       // Any network (default: none)
-    }
+    aibe: loadNet('aibe2'),
+    aibe2: loadNet('aibe2'),
+    bsctest: loadNet('bsctest'),
+    // {
+    //   provider: () => web3,
+    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
+    //   //  port: 443,            // Standard Ethereum port (default: none)
+    //   network_id: "*",       // Any network (default: none)
+    // },
+
+    // bsctest: {
+    //   provider: () => new HDWalletProvider(mnemonic, `https://data-seed-prebsc-1-s1.binance.org:8545/`),
+    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
+    //   //  port: 443,            // Standard Ethereum port (default: none)
+    //   network_id: "*",       // Any network (default: none)
+    // }
 
     //
     // An additional network, but with some advanced options…
@@ -137,10 +166,10 @@ module.exports = {
       version: "0.8.0",      // Fetch exact version from solc-bin (default: truffle's version)
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       // settings: {          // See the solidity docs for advice about optimization and evmVersion
-       optimizer: {
-         enabled: true,
-         runs: 10
-       },
+      optimizer: {
+        enabled: true,
+        runs: 10
+      },
       //  evmVersion: "byzantium"
       // }
     }

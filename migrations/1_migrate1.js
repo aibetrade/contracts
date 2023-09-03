@@ -4,11 +4,11 @@ var TarifDataLib = artifacts.require("TarifDataLib");
 var TarifUsageLib = artifacts.require("TarifUsageLib");
 var UsersStore = artifacts.require("UsersStore");
 
-module.exports = async function(deployer) {
-  await deployer.deploy(ERC20Token, "ERC20", "ERC20", 8, BigInt(10 ** (8 + 6)));
-  const erc20 = await ERC20Token.deployed();
+const conf = require('./conf.json')
 
-  console.log(erc20.address)
+module.exports = async function(deployer) {
+  await deployer.deploy(ERC20Token, "ERC20", "ERC20", 8, BigInt(10 ** (8 + 16)));
+  const erc20 = await ERC20Token.deployed();
 
   await deployer.deploy(TarifDataLib);
   await deployer.link(TarifDataLib, TarifUsageLib);
@@ -22,11 +22,18 @@ module.exports = async function(deployer) {
   await deployer.deploy(UsersStore);
   const usersStore = await UsersStore.deployed()
 
-  const accounts = await web3.eth.getAccounts()
-  await deployer.deploy(Referal, erc20.address, usersStore.address, accounts[8], 5, accounts[9], accounts[7]);
+  await deployer.deploy(Referal, erc20.address, usersStore.address);
 
   const referal = await Referal.deployed();
-  await referal.setRegisterPrice(50)
+  await referal.setRegisterPrice(conf.registerPrice)
+  await referal.setQBonus(conf.qBonus)
+  await referal.setCWallet(conf.cWallet)
+  await referal.setQWallet(conf.qWallet)
+  await referal.setMWallet(conf.mWallet)
 
   usersStore.setOwner(referal.address)
+
+  console.log('erc20.address', erc20.address)
+  console.log('referal.address', referal.address)
+  console.log('usersStore.address', usersStore.address)
 };

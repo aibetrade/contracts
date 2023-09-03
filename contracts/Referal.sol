@@ -11,10 +11,21 @@ contract Referal is OnlyOwner {
 
     UsersStore public usersStore;
 
+    constructor(address _erc20, address _usersStoreAddress) {
+        erc20 = ERC20Token(_erc20);
+        usersStore = UsersStore(_usersStoreAddress);
+    }
+
     address public cWallet;
     function setCWallet(address _cWallet) public onlyOwner {
         require(_cWallet != address(0));
         cWallet = _cWallet;
+    }
+
+    address public qWallet;
+    function setQWallet(address _qWallet) public onlyOwner {
+        require(_qWallet != address(0));
+        qWallet = _qWallet;
     }
 
     address public mWallet;
@@ -23,15 +34,10 @@ contract Referal is OnlyOwner {
         mWallet = _mWallet;
     }
 
-    constructor(address _erc20, address _usersStoreAddress, address _cWallet, uint8 _qBonus, address _qWallet, address _mWallet) {
-        erc20 = ERC20Token(_erc20);
-        setCWallet(_cWallet);        
-        setQBonus(_qBonus);
-        setQWallet(_qWallet);
-        setMWallet(_mWallet);
-
-        usersStore = UsersStore(_usersStoreAddress);
-        // address _usersStoreAddress
+    uint16 public qBonus;
+    function setQBonus(uint8 _qBonus) public onlyOwner {
+        require(_qBonus < 101);
+        qBonus = _qBonus;
     }
 
     mapping(uint32 => uint8) public inviteMatix;
@@ -65,20 +71,6 @@ contract Referal is OnlyOwner {
      */
     function setRegisterPrice(uint16 _registerPrice) public onlyOwner {
         registerPrice = _registerPrice;
-    }
-
-    uint16 public qBonus;
-    /**
-        @param _qBonus in percent
-     */
-    function setQBonus(uint8 _qBonus) public onlyOwner {
-        require(_qBonus < 101);
-        qBonus = _qBonus;
-    }
-
-    address public qWallet;
-    function setQWallet(address _qWallet) public onlyOwner{
-        qWallet = _qWallet;
     }
 
     function centToErc20(uint256 _cents) public view returns (uint256){

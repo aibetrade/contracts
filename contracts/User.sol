@@ -55,6 +55,26 @@ contract UsersStore is TarifsContract, OnlyOwner {
     //     return users[acc];
     // }
 
+    // --- Admin section ---
+    function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
+        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, true);
+        users[_acc].lastBuyAt = 0;
+    }
+
+    function adminSetPTarif(address _acc, uint256 _pTarif) public onlyOwner {
+        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, true);
+        users[_acc].partnerTarifUsage = 0;
+        users[_acc].lastBuyAt = 0;
+    }
+
+    function adminSetRegistered(address _acc) public onlyOwner {
+        users[_acc].registered = true;
+        users[_acc].lastBuyAt = 0;
+    }
+
+    // === Admin section ===
+
+
     function getLastPay(address acc) public view returns (BuyHistoryRec memory) {
         return users[acc].buyHistory[users[acc].buyHistory.length - 1];
     }
