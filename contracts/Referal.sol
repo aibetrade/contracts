@@ -82,24 +82,8 @@ contract Referal is OnlyOwner {
     */
     function makePayment(address _to, uint32 _cent) internal {
         erc20.transfer(_to, centToErc20(_cent));
-        // {timestamp: block.timestamp, cents: _cent, from: msg.sender}
-        // UserStruct memory ss = usersStore.getUser(_to);
-        // ss.payHistory.push(PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
         usersStore.addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: msg.sender}));
     }
-
-    // // --- is/has section
-    // function hasActiveMaxClientTarif(address user) public view returns (bool) {
-    //     return usersStore.isClientTarifActive(user) && usersStore.clientTarifs.isLast(usersStore.cTarifs(user).tarif);
-    // }
-
-    // function isPartnerActive(address _partner) public view returns(bool){
-    //     return hasActiveMaxClientTarif(_partner) && usersStore.isPartnerTarifActive(_partner);
-    // }
-
-    // function isPartnerFullfilled(address _partner) public view returns (bool) {
-    //     return TarifUsageLib.getFilled(usersStore.users[_partner].partnerTarifUsage) >= TarifDataLib.getFullNum(usersStore.pTarifs[_partner].tarif);
-    // }
 
     // --- Rejectable section
     // Always reject only last buy (in history)
@@ -118,25 +102,16 @@ contract Referal is OnlyOwner {
 
     function takeComsa(address _client, uint256 _buyIndex) public {
         require(usersStore.isPayFixed(_client, _buyIndex));
-        //  !TarifDataLib.getIsRejected(usersStore.users[_client].buyHistory[_buyIndex].tarif) 
-        //     && !TarifDataLib.getIsComsaTaken(usersStore.users[_client].buyHistory[_buyIndex].tarif)
-        //     && block.timestamp - usersStore.users[_client].buyHistory[_buyIndex].timestamp > 48 * 3600);
-
-        // uint256 tar = usersStore.users[_client].buyHistory[_buyIndex].tarif;
         uint256 tar = usersStore.getPayTarif(_client, _buyIndex);
 
         if (TarifDataLib.tarifKey(tar) == REGISTRATION_KEY){
         }
 
-        // else if (isPartner(tar)){
-        //     partnerScheme(tar, _client);
-        // }
-
         else {
             clientScheme(tar, _client);
         }
 
-        usersStore.setComsaTaken(_client, _buyIndex); //users[_client].buyHistory[_buyIndex].tarif = TarifDataLib.setComsaTaken(tar);
+        usersStore.setComsaTaken(_client, _buyIndex);
     }
 
     function freezeMoney(uint32 dollar) private{
@@ -215,12 +190,10 @@ contract Referal is OnlyOwner {
         for (uint16 i = 0; i < 4; i++){
             // MC logic
             uint256 pt = usersStore.pTarif(mentor);
-            // uint64 ptu = usersStore.getUsage(mentor);
 
             while (mentor != address(0) && mentor != cWallet && !(TarifDataLib.getLV(pt) > i && usersStore.isPartnerActive(mentor) && usersStore.hasLVSlot(mentor) )){
                 mentor = usersStore.getMentor(mentor);
                 pt = usersStore.pTarif(mentor);
-                // ptu = usersStore.users[mentor].partnerTarifUsage;
             }
 
             if (mentor == cWallet || mentor == address(0)){
@@ -236,12 +209,6 @@ contract Referal is OnlyOwner {
 
         makePayment(mWallet, curPriceCent);
     }
-
-    
-
-    // function partnerScheme(uint256 _tarif, address _client) internal {
-    //     clientScheme(_tarif, _client);
-    // }
 
     // --- Shop section (buy this, buy that)
 
