@@ -72,8 +72,27 @@ contract UsersStore is TarifsContract, OnlyOwner {
         users[_acc].lastBuyAt = 0;
     }
 
-    // === Admin section ===
+    function adminFillSlots(address _acc) public onlyOwner {
+        uint64 usage = users[_acc].partnerTarifUsage;
+        users[_acc].partnerTarifUsage = TarifUsageLib.buildUsage(
+                TarifDataLib.getNumSlots(usage),
+                TarifUsageLib.getUsedLVSlots(usage),
+                TarifUsageLib.getExtLevel(usage),
+                TarifUsageLib.getFilled(usage)
+            );
+    }
 
+    function adminFillLVSlots(address _acc) public onlyOwner {
+        uint64 usage = users[_acc].partnerTarifUsage;
+        users[_acc].partnerTarifUsage = TarifUsageLib.buildUsage(
+                TarifUsageLib.getUsedSlots(usage),
+                TarifDataLib.getNumLVSlots(usage),
+                TarifUsageLib.getExtLevel(usage),
+                TarifUsageLib.getFilled(usage)
+            );
+    }
+
+    // === Admin section ===
 
     function getLastPay(address acc) public view returns (BuyHistoryRec memory) {
         return users[acc].buyHistory[users[acc].buyHistory.length - 1];
