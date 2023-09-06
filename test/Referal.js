@@ -445,7 +445,7 @@ contract("Referal-Tarif", function (/* accounts */) {
     }
   })
 
-  it("Olny OWNER can add and remove tarifs", async function () {
+  it("Only OWNER can add and remove tarifs", async function () {
     const { referal, usersStore, accounts } = await init();
 
     const cliTarifs = await TarifsContractBase.at(await usersStore.clientTarifs())
@@ -490,7 +490,7 @@ contract("Referal-Tarif", function (/* accounts */) {
     }
   })
 
-  it("Parent tarfis added correctly", async function () {
+  it("Partner tarfis added correctly", async function () {
     const { referal, parTarifs } = await init();
 
     await parTarifs.clear()

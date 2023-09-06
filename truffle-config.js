@@ -15,8 +15,9 @@ function loadNet(name) {
   const key = process.env[`NET_${name.toUpperCase()}_KEY`]
 
   const provider = new HDWalletProvider(key, rpc)
+
   // const provider = () => new Web3(hdProvider)
-  return { provider, network_id: "*", }
+  return { provider, network_id: "*", timeoutBlocks: 200,}
 }
 
 // async function aaa() {
@@ -107,8 +108,8 @@ module.exports = {
     //   network_id: "*",       // Any network (default: none)
     // },
 
-    aibe: loadNet('aibe2'),
-    aibe2: loadNet('aibe2'),
+    aibe: loadNet('aibe'),
+    // aibe2: loadNet('aibe2'),
     bsctest: loadNet('bsctest'),
     // {
     //   provider: () => web3,

@@ -7,6 +7,11 @@ var UsersStore = artifacts.require("UsersStore");
 const conf = require('./conf.json')
 
 module.exports = async function(deployer) {
+  // const erc20 = await ERC20Token.new("ERC20", "ERC20", 8, BigInt(10 ** (8 + 16)))
+  // console.log(aaa)
+
+  // return
+
   await deployer.deploy(ERC20Token, "ERC20", "ERC20", 8, BigInt(10 ** (8 + 16)));
   const erc20 = await ERC20Token.deployed();
 
@@ -31,7 +36,7 @@ module.exports = async function(deployer) {
   await referal.setQWallet(conf.qWallet)
   await referal.setMWallet(conf.mWallet)
 
-  usersStore.setOwner(referal.address)
+  await usersStore.setOwner(referal.address)
 
   console.log('erc20.address', erc20.address)
   console.log('referal.address', referal.address)
