@@ -41,11 +41,11 @@ library TarifDataLib {
         return (uint16)(_tarif >> (16 * 8));
     }
 
-    function getIsRejected(uint256 _tarif) public pure returns (bool) {
+    function isRejected(uint256 _tarif) public pure returns (bool) {
         return (uint16)(_tarif >> (16 * 9)) > 0;
     }
 
-    function getIsComsaTaken(uint256 _tarif) public pure returns (bool) {
+    function isComsaTaken(uint256 _tarif) public pure returns (bool) {
         return (uint16)(_tarif >> (16 * 10)) > 0;
     }    
 

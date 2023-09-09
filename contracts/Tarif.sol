@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./OnlyOwner.sol";
 import "./TarifUsageLib.sol";
 
-contract TarifsContractBase is OnlyOwner {
+contract TarifsStoreBase is OnlyOwner {
     uint256[] public tarifs;
 
     function getAll() public view returns (uint256[] memory) {
@@ -39,8 +39,8 @@ contract TarifsContractBase is OnlyOwner {
     function append(uint256 _tarif) public onlyOwner {
         require(
             !exists(_tarif) &&
-                !TarifDataLib.getIsRejected(_tarif) &&
-                !TarifDataLib.getIsComsaTaken(_tarif)
+                !TarifDataLib.isRejected(_tarif) &&
+                !TarifDataLib.isComsaTaken(_tarif)
         );
         tarifs.push(_tarif);
     }
@@ -51,13 +51,13 @@ contract TarifsContractBase is OnlyOwner {
     }
 }
 
-contract TarifsContract {
-    TarifsContractBase public clientTarifs;
-    TarifsContractBase public partnerTarifs;
+contract TarifsStore {
+    TarifsStoreBase public clientTarifs;
+    TarifsStoreBase public partnerTarifs;
 
     constructor() {
-        clientTarifs = new TarifsContractBase();
-        partnerTarifs = new TarifsContractBase();
+        clientTarifs = new TarifsStoreBase();
+        partnerTarifs = new TarifsStoreBase();
 
         clientTarifs.setOwner(msg.sender);
         partnerTarifs.setOwner(msg.sender);

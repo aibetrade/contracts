@@ -7,7 +7,7 @@ contract ERC20Token {
     uint8 public decimals;
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
-    mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => mapping(address => uint256)) public _allowances;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
@@ -36,19 +36,23 @@ contract ERC20Token {
     }
 
     function approve(address spender, uint256 value) public returns (bool) {
-        allowance[msg.sender][spender] = value;
+        _allowances[msg.sender][spender] = value;
         emit Approval(msg.sender, spender, value);
         return true;
+    }
+
+    function allowance(address owner, address spender) public view virtual returns (uint256) {
+        return _allowances[owner][spender];
     }
 
     function transferFrom(address from, address to, uint256 value) public returns (bool) {
         require(to != address(0), "Invalid recipient address");
         require(balanceOf[from] >= value, "Insufficient balance");
-        require(allowance[from][msg.sender] >= value, "Allowance exceeded");
+        require(_allowances[from][msg.sender] >= value, "Allowance exceeded");
 
         balanceOf[from] -= value;
         balanceOf[to] += value;
-        allowance[from][msg.sender] -= value;
+        _allowances[from][msg.sender] -= value;
         emit Transfer(from, to, value);
         return true;
     }
