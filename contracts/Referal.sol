@@ -148,7 +148,7 @@ contract Referal is OnlyOwner {
 
             if (mbMen != address(0) && mbMen != address(1)) {
             // if (isPartnerActive(mentor) && hasSlot(UsersTarifsStore.pTarifs[mentor].tarif, UsersTarifsStore.users[mentor].partnerTarifUsage)){
-                uint32 matrixCent = TarifDataLib.getMatrixBonus(usersTarifsStore.pTarif(mbMen)) * 100;
+                uint32 matrixCent = TarifDataLib.getComsa(usersTarifsStore.pTarif(mbMen)) * 100;
                 makePayment(_client, mbMen, matrixCent);                
                 usersTarifsStore.useSlot(mbMen);
                 curPriceCent -= matrixCent;

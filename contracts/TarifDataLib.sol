@@ -13,51 +13,29 @@ library TarifDataLib {
         return (uint16)(_tarif >> (16 * 1));
     }
 
-    function getMatrixBonus(uint256 _tarif) public pure returns (uint16) {
+    function getNumSlots(uint256 _tarif) public pure returns (uint16) {
         return (uint16)(_tarif >> (16 * 2));
     }
 
-    function getNumSlots(uint256 _tarif) public pure returns (uint16) {
+    function getComsa(uint256 _tarif) public pure returns (uint16) {
         return (uint16)(_tarif >> (16 * 3));
     }
 
-    function getComsa(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 4));
-    }
-
     function hasCompress(uint256 _tarif) public pure returns (bool) {
-        return (uint16)(_tarif >> (16 * 5)) > 0;
+        return (uint16)(_tarif >> (16 * 4)) > 0;
     }
 
     function getNumLVSlots(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 6));
+        return (uint16)(_tarif >> (16 * 5));
     }
 
     function getLV(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 7));
+        return (uint16)(_tarif >> (16 * 6));
     }
 
     function getFullNum(uint256 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 8));
+        return (uint16)(_tarif >> (16 * 7));
     }
-
-    // function isRejected(uint256 _tarif) public pure returns (bool) {
-    //     return (uint16)(_tarif >> (16 * 9)) > 0;
-    // }
-
-    // function isComsaTaken(uint256 _tarif) public pure returns (bool) {
-    //     return (uint16)(_tarif >> (16 * 10)) > 0;
-    // }    
-
-    // --- Setters data
-
-    // function setRejected(uint256 _tarif) public pure returns (uint256) {
-    //     return _tarif | (1 << (16 * 9));
-    // }
-
-    // function setComsaTaken(uint256 _tarif) public pure returns (uint256) {
-    //     return _tarif | (1 << (16 * 10));
-    // }
 
     // ---
     function isRegister(uint256 _tarif) public pure returns (bool) {

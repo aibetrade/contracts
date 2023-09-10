@@ -124,9 +124,22 @@ async function buyTarif(tarif, acc = null) {
     }
 }
 
+async function prettyBalance(bal) {
+    const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
+    const dic = {
+        company: cWallet, quart: qWallet, magic: mWallet, finance: usersFinance.address,
+        uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc
+    }
+
+    return Object.keys(dic).reduce((s, c) => ({ ...s, [c]: bal[dic[c]] }), {})
+}
+
 async function makeBalancer() {
 
     const dif = (a, b) => Math.round(a * 100 - b * 100) / 100
+
+    const difa = (a, b) => Object.keys(a).reduce((s, c) => ({ ...s, [c]: dif(a[c], b[c]) }), {})
+    const difaa = (a, b) => Object.keys(a).reduce((s, c) => ({ ...s, [c]: difa(a[c], b[c]) }), {})
 
     const balancer = {
         records: [],
@@ -136,10 +149,32 @@ async function makeBalancer() {
             const { erc20, uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
 
             this.accs = [uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance.address]
+
+            const accInfo = async acc => {
+                const u = await getUsage(acc)
+
+                return {
+                    acc,
+                    info: {
+                        B: await fromErc20(await erc20.balanceOf(acc)),
+                        S: u.freeSlots,
+                        LV: u.freeLVSlots,
+                        F: u.filled,
+                        L: u.level
+                    }
+                }
+            }
+
             const bals = {}
             for (let acc of this.accs) {
                 bals[acc] = await fromErc20(await erc20.balanceOf(acc))
             }
+
+            const aaa = await Promise.all(this.accs.map(x => accInfo(x)))
+            const ext = aaa.reduce((s, c) => ({ ...s, [c.acc]: c.info }), {})
+            const ext2 = await prettyBalance(ext)
+
+            // const pack = {B: 25, S: 10, LV: 35, F: 0},
 
             const rec = {
                 name,
@@ -154,7 +189,9 @@ async function makeBalancer() {
                 m3Acc: await fromErc20(await erc20.balanceOf(m3Acc)),
                 m4Acc: await fromErc20(await erc20.balanceOf(m4Acc)),
                 m5Acc: await fromErc20(await erc20.balanceOf(m5Acc)),
-                bals
+                bals,
+                ext,
+                ext2
             }
 
             this.records.push(rec)
@@ -200,7 +237,8 @@ async function makeBalancer() {
                     m3Acc: dif(recb.m3Acc, reca.m3Acc),
                     m4Acc: dif(recb.m4Acc, reca.m4Acc),
                     m5Acc: dif(recb.m5Acc, reca.m5Acc),
-                    bals: this.accs.reduce((s, c) => ({ ...s, [c]: dif(recb.bals[c], reca.bals[c]) }), {})
+                    bals: this.accs.reduce((s, c) => ({ ...s, [c]: dif(recb.bals[c], reca.bals[c]) }), {}),
+                    ext2: difaa(recb.ext2, reca.ext2)
                 }
 
                 return diffRec
@@ -239,5 +277,5 @@ module.exports = {
     buyTarif,
 
     makeBalancer,
-    getNextBuyInfo 
+    getNextBuyInfo
 }

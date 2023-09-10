@@ -3,7 +3,8 @@ const { TarifData } = require("../utils/tarif")
 const tarifsConf = require('../migrations/tarifs.json')
 const { init } = require("./utils-system")
 
-const allTarifs = tarifsConf.tarifs.map(({data}) => TarifData.create(...data))
+// const allTarifs = tarifsConf.tarifs.map(({data}) => TarifData.create(...data))
+const allTarifs = tarifsConf.tarifs.map(({data}) => TarifData.fromObject(data))
 const clientTarifs = allTarifs.filter(x => !x.isPartner())
 const partnerTarifs = allTarifs.filter(x => x.isPartner())
 
