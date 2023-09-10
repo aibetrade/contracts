@@ -8,9 +8,20 @@
   },
   "scripts": {
     "test": "truffle test",
-    "test:watch": "nodemon --ext js,sol --exec truffle test"
+    "test:watch": "nodemon --ext js,sol --exec truffle test",
+    "size": "truffle run contract-size",
+    "test:aibe": "truffle test --network aibe"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.1.14",
+    "dotenv": "^16.3.1",
+    "truffle-contract-size": "^2.0.1",
+    "truffle-privatekey-provider": "^1.5.0"
+  },
+  "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.16"
+  }
 }

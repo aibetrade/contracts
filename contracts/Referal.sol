@@ -3,182 +3,239 @@ pragma solidity ^0.8.0;
 
 import "./Tarif.sol";
 import "./OnlyOwner.sol";
-import "./IERC20.sol";
-import "./User.sol";
+import "./ERC20Token.sol";
+import "./UsersTarifsStore.sol";
+import "./UsersTreeStore.sol";
 
-uint256 constant MONTH = 30 * 86400;
-uint256 constant YEAR = 360 * 86400;
+contract Referal is OnlyOwner {
+    // ERC20Token public erc20;
 
-function isClientActive(uint256 date) view returns (bool) {
-    return block.timestamp - date <= MONTH;
-}
+    UsersTarifsStore public usersTarifsStore;
+    UsersFinanceStore public usersFinance;
+    UsersTreeStore public usersTree;
 
-function isPartnerActive(uint256 date) view returns (bool) {
-    return block.timestamp - date <= YEAR;
-}
+    ERC20Token public erc20;
 
-contract ReferalBase is TarifsContract, Userable {
-    IERC20 public erc20;
-    address bene;
+    // function setUsersFinance(address _contract) public onlyOwner{
+    //     usersFinance = UsersFinanceStore(_contract);
+    // }
 
-    constructor(address _erc20, address _bene) {
-        erc20 = IERC20(_erc20);
-        bene = _bene;
-    }
-}
-
-contract ReferalClient is ReferalBase {
-    constructor(address _erc20, address _bene) ReferalBase(_erc20, _bene) {}
-
-    function clientScheme(uint16) virtual internal {
-        require(0 == 1, "Must be overriden");
+     constructor(address _usersTarifsStoreAddress, address _usersTreeAddress) {
+        // erc20 = ERC20Token(_erc20);
+        usersTarifsStore = UsersTarifsStore(_usersTarifsStoreAddress);
+        usersFinance = UsersFinanceStore(usersTarifsStore.usersFinance());
+        usersTree = UsersTreeStore(_usersTreeAddress);
+        erc20 = ERC20Token(usersFinance.erc20());
     }
 
-    function setMentor(address mentor) public {
-        require(users[msg.sender].mentor == address(0), "Already have mentor");
-        users[msg.sender].mentor = mentor;
+    address public cWallet;
+    function setCWallet(address _cWallet) public onlyOwner {
+        require(_cWallet != address(0));
+        cWallet = _cWallet;
     }
 
-    function hasMaxClientTarif() public view returns (bool) {
-        require(
-            isClientActive(users[msg.sender].clientTarifAt),
-            "No active client tarif"
-        );
-        return getPrice(users[msg.sender].clientTarif) == maxClientPrice();
+    address public qWallet;
+    function setQWallet(address _qWallet) public onlyOwner {
+        require(_qWallet != address(0));
+        qWallet = _qWallet;
     }
 
-    function buyClientTarif(uint128 _tarif) internal {
-        require(users[msg.sender].mentor != address(0), "You need mentor");
-
-        clientScheme(getPrice(_tarif));
-
-        newClientTarif(_tarif);
+    address public mWallet;
+    function setMWallet(address _mWallet) public onlyOwner {
+        require(_mWallet != address(0));
+        mWallet = _mWallet;
     }
-}
 
-contract ReferalPartner is ReferalClient {
+    uint16 public qBonus;
+    function setQBonus(uint8 _qBonus) public onlyOwner {
+        require(_qBonus < 101);
+        qBonus = _qBonus;
+    }
+
+    mapping(uint32 => uint8) public inviteMatix;
+
+    function getInvitePercent(uint16 _pTarifKey, uint16 _cTarifKey) public view returns(uint8) {
+        uint32 key = (uint32(_pTarifKey) << 16) | _cTarifKey;
+        return inviteMatix[key];
+    }
+
+    function setInviteMatrix(uint32[] memory keys, uint8[] memory percs) public onlyOwner {
+        require(keys.length == percs.length);
+        for (uint8 i = 0; i < keys.length; i++){
+            inviteMatix[keys[i]] = percs[i];
+        }
+    }
+
     uint16 public registerPrice;
-
-    constructor(address _erc20, address _bene) ReferalClient(_erc20, _bene){}
-
-    function clientScheme(uint16 price) override internal {
-        // TODO: Some client transferring magic
-        // erc20.transferFrom(msg.sender, address(this), getPrice(data));
+    /**
+        @param _registerPrice in dollars
+     */
+    function setRegisterPrice(uint16 _registerPrice) public onlyOwner {
+        registerPrice = _registerPrice;
     }
 
-    function partnerScheme(uint16 price) private {
-        // TODO: Some client transferring magic
-        // erc20.transferFrom(msg.sender, address(this), getPrice(data));
+    /** 
+        Logged payment to address in cents. Appends record to history.
+    */
+    function makePayment(address _from, address _to, uint64 _cent) internal {
+        usersFinance.makePayment(_from, _to, _cent);
     }
 
-    function setRegisterPrice(uint16 price) public onlyOwner {
-        registerPrice = price;
+    function canTakeComsa(address _client) public view returns(bool){        
+        BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
+        if (buy.tarif == 0 || buy.rejected) return false;
+
+        return usersFinance.comsaExists(_client);
     }
 
-    function RegitsterPartner() public {
-        require(hasMaxClientTarif(), "Need MAX client tarif");
-        require(users[msg.sender].registered == false, "Already registered");
+    function takeComsa(address _client) public {
+        require(canTakeComsa(_client));
+        processComsa(_client);
+    }
 
-        // Enough money to buy tarif
+    // --- Payment schemes section
+    function processComsa(address _client) internal {
+        // require(canTakeComsa(_client), "Cant process");
+        address mentor = usersTree.getMentor(_client);
+        if (mentor == address(1)) mentor = cWallet;        
+        
+        BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
+
+        uint256 _tarif = buy.tarif;
+        uint32 basePriceCent = uint32(buy.count) * TarifDataLib.getPrice(_tarif) * 100;        
+
+        uint32 curPriceCent = basePriceCent;
+        usersTarifsStore.useFill(mentor);
+
+        // Invite bonus processing
+        if (usersTarifsStore.isPartnerActive(mentor)){
+            uint32 invitePercent;
+            bool takeInviteBonus = false;
+            if (TarifDataLib.isPartner(_tarif)){
+                if (!usersTarifsStore.hasPInviteBonus(_client)){
+                    usersTarifsStore.givePInviteBonus(_client);
+                    takeInviteBonus = true;
+                }
+            }
+            else {
+                if (!usersTarifsStore.hasCInviteBonus(_client)){
+                    usersTarifsStore.giveCInviteBonus(_client);
+                    takeInviteBonus = true;
+                }                 
+            }
+            if (takeInviteBonus){
+                invitePercent = getInvitePercent(TarifDataLib.tarifKey(usersTarifsStore.pTarif(mentor)), TarifDataLib.tarifKey(_tarif));
+                require(invitePercent > 0, "IP is 0");
+                makePayment(_client, mentor, invitePercent * basePriceCent / 100);
+                curPriceCent -= invitePercent * basePriceCent / 100;
+            }            
+        }
+
+        // Quarterly bonus (5%) 
+        makePayment(_client, qWallet, basePriceCent * 5 / 100);
+        curPriceCent -= basePriceCent * 5 / 100;
+
+        // CWallet comission (30%)
+        makePayment(_client, cWallet, basePriceCent * 30 / 100);
+        curPriceCent -= basePriceCent * 30 / 100;
+
+        // --- Matrix bonus get first available person
+        {
+            address mbMen = mentor;
+            while (mbMen != address(0) && mbMen != address(1) && !(usersTarifsStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersTarifsStore.hasCompress(mbMen)) && usersTarifsStore.hasSlot(mbMen))){
+                mbMen = usersTree.getMentor(mbMen);
+            }
+
+            if (mbMen != address(0) && mbMen != address(1)) {
+            // if (isPartnerActive(mentor) && hasSlot(UsersTarifsStore.pTarifs[mentor].tarif, UsersTarifsStore.users[mentor].partnerTarifUsage)){
+                uint32 matrixCent = TarifDataLib.getComsa(usersTarifsStore.pTarif(mbMen)) * 100;
+                makePayment(_client, mbMen, matrixCent);                
+                usersTarifsStore.useSlot(mbMen);
+                curPriceCent -= matrixCent;
+            }
+        }
+
+        // LV logic
+        uint32 lvCent = curPriceCent / 4;
+        for (uint8 i = 0; i < 4; i++){
+            // MC logic
+            uint256 pt = usersTarifsStore.pTarif(mentor);
+
+            while (mentor != address(0) && mentor != address(1) && !(TarifDataLib.getLV(pt) > i && usersTarifsStore.isPartnerActive(mentor) && usersTarifsStore.hasLVSlot(mentor) )){
+                mentor = usersTree.getMentor(mentor);
+                pt = usersTarifsStore.pTarif(mentor);
+            }
+
+            if (mentor == address(1) || mentor == address(0)){
+                break;
+            }
+            else{
+                makePayment(_client, mentor, lvCent);
+                usersTarifsStore.useLVSlot(mentor);
+                curPriceCent -= lvCent;
+                mentor = usersTree.getMentor(mentor);
+            }
+        }
+
+        makePayment(_client, mWallet, curPriceCent);
+        usersFinance.setComsaExists(_client, false);
+    }
+
+    // --- Shop section (buy this, buy that)
+
+    function regitsterPartner() public {
+        require(usersTarifsStore.canRegister(msg.sender));      
+        usersFinance.freezeMoney(registerPrice, msg.sender);  
+        makePayment(msg.sender, cWallet, registerPrice * 100);
+        usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
+        usersTarifsStore.register(msg.sender);
+    }
+
+    function canBuy(address _acc) public view returns (bool) {
+        if (usersTree.getMentor(msg.sender) == address(0)) return false;
+        BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
+        return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
+    }
+
+    function buyClientTarif(uint256 _tarif) public {
+        require(usersTarifsStore.cTarifExists(_tarif) && canBuy(msg.sender), "E117");
+
+        // Если предыдущую комсу не забрали, заберем ее.
+        if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
+
+        usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif), msg.sender);
+        usersTarifsStore.newClientTarif(msg.sender, _tarif);        
+        processComsa(msg.sender);
+    }
+
+    function buyPartnerTarif(uint256 _tarif) public {
         require(
-            erc20.allowance(msg.sender, address(this)) >= registerPrice,
-            "Insufficient allowance"
-        );
+            usersTarifsStore.registered(msg.sender)
+            && usersTarifsStore.hasActiveMaxClientTarif(msg.sender)
+            && usersTarifsStore.isPartnerFullfilled(msg.sender)
+            && canBuy(msg.sender), "E118");
 
-        erc20.transferFrom(msg.sender, address(this), registerPrice);
+        // Если предыдущую комсу не забрали, заберем ее.
+        if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
-        users[msg.sender].registered = true;
-    }
+        uint16 buyCount = 1;
+        uint16 level = 1;
 
-    function isPartnerFullfilled() public view returns (bool) {
-        require(
-            isPartnerActive(users[msg.sender].partnerTarifAt),
-            "No active parent tarif"
-        );
-        uint64 tu = users[msg.sender].partnerTarifUsage;
-        return getUsedSlots(tu) == getNumSlots(tu) * (getExtLevel(tu) + 1);
-    }
+        if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
+            require(usersTarifsStore.isT1BetterOrSameT2(_tarif, usersTarifsStore.pTarif(msg.sender)));
 
-    function buyPartnerTarif(uint128 _tarif) internal {
-        require(users[msg.sender].registered, "Need registration");
-        require(hasMaxClientTarif(), "Need max client tarif");
-        require(
-            !isPartnerActive(users[msg.sender].partnerTarifAt),
-            "Already have active parent tarif"
-        );
-        require(
-            partnerTarifs[0] == _tarif,
-            "Can buy only lowest partner tarif"
-        );
+            buyCount = usersTarifsStore.getLevel(msg.sender);
+            if (TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender)) == TarifDataLib.tarifKey(_tarif)){
+                level = buyCount + 1;
+                buyCount = 1;                
+            }
+            else
+                level = buyCount;
+        }
 
-        partnerScheme(getPrice(_tarif));
+        usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif) * buyCount, msg.sender);
 
-        newPartnerTarif(_tarif);
-    }
-
-    function extendTarif() public {
-        require(isPartnerFullfilled(), "Need fill all partner tarifs");
-
-        partnerScheme(getPrice(users[msg.sender].partnerTarif));
-
-        uint64 tu = users[msg.sender].partnerTarifUsage;
-        users[msg.sender].partnerTarifUsage = setExtLevel(
-            tu,
-            getExtLevel(tu) + 1
-        );
-        users[msg.sender].partnerTarifAt = block.timestamp;
-
-        users[msg.sender].buyHistory.push(
-            BuyHistoryRec({
-                tarif: users[msg.sender].partnerTarif,
-                timestamp: block.timestamp,
-                amount: 1
-            })
-        );
-    }
-
-    function upgradeTarif() public {
-        require(isPartnerFullfilled(), "Need fill all partner tarifs");
-
-        uint16 extLevel = getExtLevel(users[msg.sender].partnerTarifUsage);
-        uint16 ti = pPriceHash[getPrice(users[msg.sender].partnerTarif)] + 1;
-        require(ti < partnerTarifs.length, "No better tarif");
-        uint128 pt = partnerTarifs[ti];
-
-        partnerScheme(getPrice(ti) * (extLevel + 1));
-
-        users[msg.sender].partnerTarif = pt;
-        users[msg.sender].partnerTarifUsage = setExtLevel(0, extLevel);
-        users[msg.sender].partnerTarifAt = block.timestamp;
-
-        users[msg.sender].buyHistory.push(
-            BuyHistoryRec({
-                tarif: users[msg.sender].partnerTarif,
-                timestamp: block.timestamp,
-                amount: (extLevel + 1)
-            })
-        );
-    }
-
-    function buyTarif(uint128 _tarif) public {
-        // Tarif must exists
-        require(tarifsHash[_tarif] == true, "Tarif not found");
-
-        // Enough money to buy tarif
-        require(
-            erc20.allowance(msg.sender, address(this)) >= getPrice(_tarif),
-            "Insufficient allowance"
-        );
-
-        if (isPartner(_tarif)) buyPartnerTarif(_tarif);
-        else buyClientTarif(_tarif);
-
-        users[msg.sender].buyHistory.push(
-            BuyHistoryRec({
-                tarif: _tarif,
-                timestamp: block.timestamp,
-                amount: 1
-            })
-        );
+        // Если есть невзятая комиссия, то забрать ее. Иначе просто запомнить текущий платеж.
+        usersTarifsStore.newPartnerTarif(msg.sender, _tarif, buyCount, level);
     }
 }

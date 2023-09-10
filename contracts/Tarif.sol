@@ -2,119 +2,81 @@
 pragma solidity ^0.8.0;
 
 import "./OnlyOwner.sol";
+import "./TarifUsageLib.sol";
 
-// Static tarif data (not changable)
-contract TarifData {
-    function isPartner(uint128 _tarif) public pure returns (bool) {
-        return getNumSlots(_tarif) > 0;
+// struct Tarif {
+//     uint16 key;
+//     uint16 price;
+//     uint16 numSlots;
+//     uint16 comsa;
+//     uint16 hasCompess;
+//     uint16 numLVSlots;
+//     uint16 LV;
+//     uint16 fullNum;
+// }
+
+contract TarifsStoreBase is OnlyOwner {
+    uint256[] public tarifs;
+
+    function getAll() public view returns (uint256[] memory) {
+        return tarifs;
     }
 
-    function getPrice(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif);
+    function setAll(uint256[] memory _tarifs) public onlyOwner {
+        tarifs = _tarifs;
     }
 
-    function getInvitePercent(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 1));
+    // // Static tarif data (not changable)
+    function tarifsCount() public view returns (uint256) {
+        return tarifs.length;
     }
 
-    function getNumSlots(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 2));
+    function exists(uint256 _tarif) public view returns (bool) {
+        uint16 key = TarifDataLib.tarifKey(_tarif);
+        for (uint8 i = 0; i < tarifs.length; i++) {
+            if (TarifDataLib.tarifKey(tarifs[i]) == key) return true;
+        }
+        return false;
     }
 
-    function getComsa(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 3));
-    }
-
-    function hasCompress(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 4));
-    }
-
-    function getNumLVSlots(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 5));
-    }
-
-    function hasMaxLVComsa(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 6));
-    }
-
-    function getLV(uint128 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 7));
-    }
-}
-
-contract TarifUsage {
-    function getUsedSlots(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif);
-    }
-
-    function getUsedLVSlots(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 1));
-    }
-
-    function getExtLevel(uint64 _tarif) public pure returns (uint16) {
-        return (uint16)(_tarif >> (16 * 2));
-    }
-
-    // --- Setters
-
-    function setUsedSlots(
-        uint64 _tarif,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _tarif & (_value);
-    }
-
-    function setUsedLVSlots(
-        uint64 _tarif,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _tarif & (_value << (16 * 1));
-    }
-
-    function setExtLevel(
-        uint64 _tarif,
-        uint16 _value
-    ) public pure returns (uint64) {
-        return _tarif & (_value << (16 * 2));
+    function isLast(uint256 _tarif) public view returns (bool) {
+        if (tarifs.length == 0) return false;
+        return
+            TarifDataLib.tarifKey(_tarif) ==
+            TarifDataLib.tarifKey(tarifs[tarifs.length - 1]);
     }
 }
 
-contract TarifsContract is OnlyOwner, TarifData, TarifUsage {
-    uint128[] public clientTarifs;
-    uint128[] public partnerTarifs;
-    mapping(uint128 => bool) public tarifsHash;
-    mapping(uint16 => uint8) public pPriceHash;
+contract TarifsStore {
+    TarifsStoreBase public clientTarifs;
+    TarifsStoreBase public partnerTarifs;
 
-    // Function to add a new tariff
-    function addTarif(uint128 _tarif) public onlyOwner {
-        require(tarifsHash[_tarif] == false, "Tarif exists");
-        tarifsHash[_tarif] = true;
+    constructor() {
+        clientTarifs = new TarifsStoreBase();
+        partnerTarifs = new TarifsStoreBase();
 
-        if (isPartner(_tarif)) {
-            partnerTarifs.push(_tarif);
-            pPriceHash[getPrice(_tarif)] = (uint8)(partnerTarifs.length - 1);
-        } else clientTarifs.push(_tarif);
+        clientTarifs.setOwner(msg.sender);
+        partnerTarifs.setOwner(msg.sender);
     }
 
-    // Function to get the number of tarifs
-    function maxClientPrice() public view returns (uint16) {
-        require(clientTarifs.length > 0, "No client tarifs added");
-        return getPrice(clientTarifs[clientTarifs.length - 1]);
-    }
+    function isT1BetterOrSameT2(
+        uint256 _tarif1,
+        uint256 _tarif2
+    ) public view returns (bool) {
+        bool t2Found = false;
+        uint16 k1 = TarifDataLib.tarifKey(_tarif1);
+        uint16 k2 = TarifDataLib.tarifKey(_tarif2);
 
-    function getClientTarifCount() public view returns (uint256) {
-        return clientTarifs.length;
-    }
+        if (k2 == 0) return true; // Any model better then none.
+        // if (k1 == k2) return true;
 
-    function getPartnerTarifCount() public view returns (uint256) {
-        return clientTarifs.length;
-    }
+        for (uint8 i = 0; i < partnerTarifs.tarifsCount(); i++) {
+            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == k2)
+                t2Found = true;
+            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == k1)
+                return t2Found;
+        }
 
-    function getClientTarifs() public view returns(uint128[] memory) {
-        return clientTarifs;
-    }
-
-    function getPartnerTarifs() public view returns(uint128[] memory) {
-        return partnerTarifs;
+        return false;
     }
 }
