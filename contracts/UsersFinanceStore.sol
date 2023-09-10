@@ -8,7 +8,7 @@ import "./ERC20Token.sol";
 struct PayHistoryRec {
     address from;
     uint256 timestamp;
-    uint32 cents;
+    uint64 cents;
 }
 
 struct BuyHistoryRec {
@@ -49,6 +49,7 @@ contract UsersFinanceStore is MultyOwner {
     }
 
     function getLastBuy(address _acc) public view returns (BuyHistoryRec memory) {
+        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(address(0), 0, 0, 0, false);
         return users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
     }
 
@@ -87,10 +88,7 @@ contract UsersFinanceStore is MultyOwner {
         uint32 price = TarifDataLib.getPrice(buy.tarif);
         uint32 count = buy.count;
         erc20.transfer(_acc, centToErc20(count * price * 100));
-    }
-
-    function isRejected(address _acc, uint256 _buyIndex) public view returns (bool) {
-        return TarifDataLib.isRejected(users[_acc].buyHistory[_buyIndex].tarif);
+        comsaExists[_acc] = false;
     }
 
     function centToErc20(uint256 _cents) public view returns (uint256){
@@ -101,7 +99,7 @@ contract UsersFinanceStore is MultyOwner {
         erc20.transferFrom(_from, address(this), centToErc20(dollar * 100));
     }
 
-    function makePayment(address _from, address _to, uint32 _cent) public onlyOwner {
+    function makePayment(address _from, address _to, uint64 _cent) public onlyOwner {
         erc20.transfer(_to, centToErc20(_cent));
         addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from}));
     }

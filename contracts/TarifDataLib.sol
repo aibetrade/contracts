@@ -41,23 +41,23 @@ library TarifDataLib {
         return (uint16)(_tarif >> (16 * 8));
     }
 
-    function isRejected(uint256 _tarif) public pure returns (bool) {
-        return (uint16)(_tarif >> (16 * 9)) > 0;
-    }
+    // function isRejected(uint256 _tarif) public pure returns (bool) {
+    //     return (uint16)(_tarif >> (16 * 9)) > 0;
+    // }
 
-    function isComsaTaken(uint256 _tarif) public pure returns (bool) {
-        return (uint16)(_tarif >> (16 * 10)) > 0;
-    }    
+    // function isComsaTaken(uint256 _tarif) public pure returns (bool) {
+    //     return (uint16)(_tarif >> (16 * 10)) > 0;
+    // }    
 
     // --- Setters data
 
-    function setRejected(uint256 _tarif) public pure returns (uint256) {
-        return _tarif | (1 << (16 * 9));
-    }
+    // function setRejected(uint256 _tarif) public pure returns (uint256) {
+    //     return _tarif | (1 << (16 * 9));
+    // }
 
-    function setComsaTaken(uint256 _tarif) public pure returns (uint256) {
-        return _tarif | (1 << (16 * 10));
-    }
+    // function setComsaTaken(uint256 _tarif) public pure returns (uint256) {
+    //     return _tarif | (1 << (16 * 10));
+    // }
 
     // ---
     function isRegister(uint256 _tarif) public pure returns (bool) {

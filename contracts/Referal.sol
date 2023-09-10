@@ -53,28 +53,17 @@ contract Referal is OnlyOwner {
     }
 
     mapping(uint32 => uint8) public inviteMatix;
-    /**
-        Set invite percent for partner tarif selling client tarif.
-        @param _pTarif parent tarif
-        @param _cTarif client tarif (sell from parent)
-        @param _percent Invite percent (give once)
-     */
-    function setInvitePercent(uint256 _pTarif, uint256 _cTarif, uint8 _percent) public onlyOwner {
-        require(_percent < 101);
 
-        uint32 pTarifKey = TarifDataLib.tarifKey(_pTarif);
-        uint32 cTarifKey = TarifDataLib.tarifKey(_cTarif);
-
-        uint32 key = pTarifKey | (cTarifKey << 16);
-        inviteMatix[key] = _percent;
+    function getInvitePercent(uint16 _pTarifKey, uint16 _cTarifKey) public view returns(uint8) {
+        uint32 key = (uint32(_pTarifKey) << 16) | _cTarifKey;
+        return inviteMatix[key];
     }
 
-    function getInvitePercent(uint256 _pTarif, uint256 _cTarif) public view returns(uint8) {
-        uint32 pTarifKey = TarifDataLib.tarifKey(_pTarif);
-        uint32 cTarifKey = TarifDataLib.tarifKey(_cTarif);
-
-        uint32 key = pTarifKey | (cTarifKey << 16);
-        return inviteMatix[key];
+    function setInviteMatrix(uint32[] memory keys, uint8[] memory percs) public onlyOwner {
+        require(keys.length == percs.length);
+        for (uint8 i = 0; i < keys.length; i++){
+            inviteMatix[keys[i]] = percs[i];
+        }
     }
 
     uint16 public registerPrice;
@@ -88,39 +77,39 @@ contract Referal is OnlyOwner {
     /** 
         Logged payment to address in cents. Appends record to history.
     */
-    function makePayment(address _from, address _to, uint32 _cent) internal {
-        usersTarifsStore.makePayment(_from, _to, _cent);
+    function makePayment(address _from, address _to, uint64 _cent) internal {
+        usersFinance.makePayment(_from, _to, _cent);
     }
 
-    function canProcessComsa(address _client) public view returns(bool){
+    function canTakeComsa(address _client) public view returns(bool){        
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
-        if (buy.tarif == 0 || TarifDataLib.isRejected(buy.tarif)) return false;
+        if (buy.tarif == 0 || buy.rejected) return false;
 
         return usersFinance.comsaExists(_client);
     }
 
+    function takeComsa(address _client) public {
+        require(canTakeComsa(_client));
+        processComsa(_client);
+    }
+
     // --- Payment schemes section
     function processComsa(address _client) internal {
-        // require(canProcessComsa(_client), "Cant process");
+        // require(canTakeComsa(_client), "Cant process");
         address mentor = usersTree.getMentor(_client);
-        BuyHistoryRec memory buy = usersFinance.getLastBuy(msg.sender);
+        if (mentor == address(1)) mentor = cWallet;        
+        
+        BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
 
         uint256 _tarif = buy.tarif;
-        uint16 count = TarifDataLib.isPartner(_tarif) ? usersTarifsStore.getLevel(_client) : 1;
-        uint32 basePriceCent = count * TarifDataLib.getPrice(_tarif) * 100;
-
-        if (mentor == cWallet) {
-            makePayment(_client, cWallet, basePriceCent);
-            usersFinance.setComsaExists(msg.sender, false);
-            return;
-        }
+        uint32 basePriceCent = uint32(buy.count) * TarifDataLib.getPrice(_tarif) * 100;        
 
         uint32 curPriceCent = basePriceCent;
-        usersTarifsStore.useFill(mentor); //, TarifUsageLib.useFill(usersTarifsStore.getUsage(mentor)));        
+        usersTarifsStore.useFill(mentor);
 
         // Invite bonus processing
         if (usersTarifsStore.isPartnerActive(mentor)){
-            uint8 invitePercent;
+            uint32 invitePercent;
             bool takeInviteBonus = false;
             if (TarifDataLib.isPartner(_tarif)){
                 if (!usersTarifsStore.hasPInviteBonus(_client)){
@@ -135,8 +124,8 @@ contract Referal is OnlyOwner {
                 }                 
             }
             if (takeInviteBonus){
-                invitePercent = getInvitePercent(usersTarifsStore.pTarif(mentor), _tarif);
-                require(invitePercent > 0);
+                invitePercent = getInvitePercent(TarifDataLib.tarifKey(usersTarifsStore.pTarif(mentor)), TarifDataLib.tarifKey(_tarif));
+                require(invitePercent > 0, "IP is 0");
                 makePayment(_client, mentor, invitePercent * basePriceCent / 100);
                 curPriceCent -= invitePercent * basePriceCent / 100;
             }            
@@ -153,11 +142,11 @@ contract Referal is OnlyOwner {
         // --- Matrix bonus get first available person
         {
             address mbMen = mentor;
-            while (mbMen != address(0) && mbMen != cWallet && !(usersTarifsStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersTarifsStore.hasCompress(mbMen)) && usersTarifsStore.hasSlot(mbMen))){
+            while (mbMen != address(0) && mbMen != address(1) && !(usersTarifsStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersTarifsStore.hasCompress(mbMen)) && usersTarifsStore.hasSlot(mbMen))){
                 mbMen = usersTree.getMentor(mbMen);
             }
 
-            if (mbMen != address(0) && mbMen != cWallet) {
+            if (mbMen != address(0) && mbMen != address(1)) {
             // if (isPartnerActive(mentor) && hasSlot(UsersTarifsStore.pTarifs[mentor].tarif, UsersTarifsStore.users[mentor].partnerTarifUsage)){
                 uint32 matrixCent = TarifDataLib.getMatrixBonus(usersTarifsStore.pTarif(mbMen)) * 100;
                 makePayment(_client, mbMen, matrixCent);                
@@ -166,19 +155,18 @@ contract Referal is OnlyOwner {
             }
         }
 
-        uint32 lvCent = curPriceCent / 4;
-
         // LV logic
-        for (uint16 i = 0; i < 4; i++){
+        uint32 lvCent = curPriceCent / 4;
+        for (uint8 i = 0; i < 4; i++){
             // MC logic
             uint256 pt = usersTarifsStore.pTarif(mentor);
 
-            while (mentor != address(0) && mentor != cWallet && !(TarifDataLib.getLV(pt) > i && usersTarifsStore.isPartnerActive(mentor) && usersTarifsStore.hasLVSlot(mentor) )){
+            while (mentor != address(0) && mentor != address(1) && !(TarifDataLib.getLV(pt) > i && usersTarifsStore.isPartnerActive(mentor) && usersTarifsStore.hasLVSlot(mentor) )){
                 mentor = usersTree.getMentor(mentor);
                 pt = usersTarifsStore.pTarif(mentor);
             }
 
-            if (mentor == cWallet || mentor == address(0)){
+            if (mentor == address(1) || mentor == address(0)){
                 break;
             }
             else{
@@ -190,7 +178,7 @@ contract Referal is OnlyOwner {
         }
 
         makePayment(_client, mWallet, curPriceCent);
-        usersFinance.setComsaExists(msg.sender, false);
+        usersFinance.setComsaExists(_client, false);
     }
 
     // --- Shop section (buy this, buy that)
@@ -203,16 +191,21 @@ contract Referal is OnlyOwner {
         usersTarifsStore.register(msg.sender);
     }
 
+    function canBuy(address _acc) public view returns (bool) {
+        if (usersTree.getMentor(msg.sender) == address(0)) return false;
+        BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
+        return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
+    }
+
     function buyClientTarif(uint256 _tarif) public {
-        require(usersTarifsStore.cTarifExists(_tarif) && usersTree.getMentor(msg.sender) != address(0), "E117");
+        require(usersTarifsStore.cTarifExists(_tarif) && canBuy(msg.sender), "E117");
+
+        // Если предыдущую комсу не забрали, заберем ее.
+        if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
+
         usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif), msg.sender);
         usersTarifsStore.newClientTarif(msg.sender, _tarif);        
         processComsa(msg.sender);
-    }
-
-    function canBuy(address _acc) public view returns (bool) {
-        BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
-        return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
     }
 
     function buyPartnerTarif(uint256 _tarif) public {
@@ -220,9 +213,10 @@ contract Referal is OnlyOwner {
             usersTarifsStore.registered(msg.sender)
             && usersTarifsStore.hasActiveMaxClientTarif(msg.sender)
             && usersTarifsStore.isPartnerFullfilled(msg.sender)
-            && canBuy(msg.sender), "AAA");
+            && canBuy(msg.sender), "E118");
 
-        // require(usersTarifsStore.canBuyPTarif(msg.sender)); // && (block.timestamp - usersFinance.lastBuyTime(msg.sender) > 48 * 3600));
+        // Если предыдущую комсу не забрали, заберем ее.
+        if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
         uint16 buyCount = 1;
         uint16 level = 1;
@@ -241,19 +235,7 @@ contract Referal is OnlyOwner {
 
         usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif) * buyCount, msg.sender);
 
-        // Если предыдущую комсу не забрали, заберем ее.
-        if (usersFinance.comsaExists(msg.sender)){
-            processComsa(msg.sender);
-        }
-
         // Если есть невзятая комиссия, то забрать ее. Иначе просто запомнить текущий платеж.
         usersTarifsStore.newPartnerTarif(msg.sender, _tarif, buyCount, level);
-
-        // UsersTarifsStore.getLastBuyTime(_acc);
-        // freezeMoney(TarifDataLib.getPrice(_tarif) * buyCount);
-        // UsersTarifsStore.setLastBuyTime(msg.sender, block.timestamp);
-        
-        // uint64 usage = UsersTarifsStore.getUsage(msg.sender);
-        // UsersTarifsStore.setUsage(msg.sender, TarifUsageLib.buildUsage(TarifUsageLib.getUsedSlots(usage), TarifUsageLib.getUsedLVSlots(usage), ext, 0));
     }
 }

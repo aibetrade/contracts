@@ -127,11 +127,8 @@ async function makeBalancer() {
         },
 
         diff(nameb, namea) {
-            namea = namea || this.records[0].name
-            nameb = nameb || this.records[1].name
-
-            const reca = this.records.filter(x => x.name == namea)[0]
-            const recb = this.records.filter(x => x.name == nameb)[0]
+            const reca = namea ? this.records.filter(x => x.name == namea)[0] : this.records.slice(-2)[0]
+            const recb = nameb ? this.records.filter(x => x.name == nameb)[0] : this.records.slice(-1)[0]
 
             if (reca && recb) {
                 const diffRec = {
@@ -464,8 +461,7 @@ module.exports = {
 
     makeBalancer,
 
-    userHasCTarif,
-    userHasPTarif,
+
 
     getNextBuyInfo,
     prettyUsage

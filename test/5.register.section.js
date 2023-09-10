@@ -1,4 +1,6 @@
-const { init, clientTarifs, oneAddress, buyTarif, mustFail, partnerTarifs, toErc20, register } = require("./utils");
+const { buyTarif, toErc20, register } = require("./utils-finance");
+const { init, mustFail } = require("./utils-system");
+const { partnerTarifs, clientTarifs } = require("./utils-tarifs");
 
 module.exports = () => {
     // Check can buy partner tarif
@@ -45,14 +47,10 @@ module.exports = () => {
         const {uAcc, usersTarifsStore} = await init();
 
         assert.deepEqual(await usersTarifsStore.isPartnerTarifActive(uAcc), false)
-        // const activeBefore = await usersTarifsStore.isPartnerTarifActive(uAcc)
         
         await register(uAcc)
 
         assert.deepEqual(await usersTarifsStore.isPartnerTarifActive(uAcc), false)
-        // const activeAfter = await usersTarifsStore.isPartnerTarifActive(uAcc)
-
-        // console.log({activeBefore, activeAfter})
     })
 
     it("Can NOT Register twice", async function () {

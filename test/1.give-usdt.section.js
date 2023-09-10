@@ -1,4 +1,5 @@
-const { init, toErc20 } = require("./utils");
+const { toErc20 } = require("./utils-finance");
+const { init } = require("./utils-system");
 
 module.exports = () => {
     it("Give all by 10000 USDT", async function () {

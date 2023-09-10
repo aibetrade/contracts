@@ -1,5 +1,8 @@
 const { TarifData } = require("../utils/tarif");
-const { init, buyTarif, partnerTarifs, mustFail, userHasPTarif, span49h, makeBalancer, span31d, maxClientTarif, register, userHasCTarif, oneAddress, getNextBuyInfo, tarifs, prettyUsage } = require("./utils");
+const { buyTarif, getNextBuyInfo, makeBalancer, register } = require("./utils-finance");
+const { init, span49h, oneAddress } = require("./utils-system");
+const { userHasPTarif, userHasCTarif, partnerTarifs, maxClientTarif, getUsage } = require("./utils-tarifs");
+
 
 module.exports = () => {
     it("Can NOT reject if no parent traif or time is up", async function () {
@@ -38,7 +41,7 @@ module.exports = () => {
 
         const nextBuy = await getNextBuyInfo(partnerTarifs[0], m1Acc)
         const pTarifBeforeBuy = await usersTarifsStore.pTarifs(m1Acc)
-        const usageBeforeBuy = prettyUsage(await usersTarifsStore.usage(m1Acc))
+        const usageBeforeBuy = await getUsage(m1Acc)
 
         await buyTarif(partnerTarifs[0], m1Acc)
         await usersTarifsStore.adminSetFilled(m1Acc)
@@ -51,7 +54,7 @@ module.exports = () => {
         await bal.append()
 
         const pTarifAfterReject = await usersTarifsStore.pTarifs(m1Acc)
-        const usageAfterReject = prettyUsage(await usersTarifsStore.usage(m1Acc))
+        const usageAfterReject = await getUsage(m1Acc)
         const buy = await usersFinance.getLastBuy(m1Acc)
 
         // Check tarif rollback is ok

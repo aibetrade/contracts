@@ -11,21 +11,25 @@ contract TarifsStoreBase is OnlyOwner {
         return tarifs;
     }
 
-    // Static tarif data (not changable)
+    function setAll(uint256[] memory _tarifs) public onlyOwner {
+        tarifs = _tarifs;
+    }
+
+    // // Static tarif data (not changable)
     function tarifsCount() public view returns (uint256) {
         return tarifs.length;
     }
 
-    // Static tarif data (not changable)
-    function tarif(uint16 _key) public view returns (uint256) {
-        for (uint8 i = 0; i < tarifs.length; i++)
-            if (TarifDataLib.tarifKey(tarifs[i]) == _key) return tarifs[i];
-        return 0;
-    }
+    // // Static tarif data (not changable)
+    // function tarif(uint16 _key) public view returns (uint256) {
+    //     for (uint8 i = 0; i < tarifs.length; i++)
+    //         if (TarifDataLib.tarifKey(tarifs[i]) == _key) return tarifs[i];
+    //     return 0;
+    // }
 
-    function clear() public onlyOwner {
-        tarifs = new uint256[](0);
-    }
+    // function clear() public onlyOwner {
+    //     tarifs = new uint256[](0);
+    // }
 
     function exists(uint256 _tarif) public view returns (bool) {
         uint16 key = TarifDataLib.tarifKey(_tarif);
@@ -35,15 +39,11 @@ contract TarifsStoreBase is OnlyOwner {
         return false;
     }
 
-    // Function to add a new tariff
-    function append(uint256 _tarif) public onlyOwner {
-        require(
-            !exists(_tarif) &&
-                !TarifDataLib.isRejected(_tarif) &&
-                !TarifDataLib.isComsaTaken(_tarif)
-        );
-        tarifs.push(_tarif);
-    }
+    // // Function to add a new tariff
+    // function append(uint256 _tarif) public onlyOwner {
+    //     require(!exists(_tarif) );
+    //     tarifs.push(_tarif);
+    // }
 
     function isLast(uint256 _tarif) public view returns (bool) {
         if (tarifs.length == 0) return false;

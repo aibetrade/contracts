@@ -188,6 +188,7 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
         usage[_acc].level = _level;
         usage[_acc].filled = 0;
+        usersFinance.setComsaExists(_acc, true);
     }
 
     function canReject(address _acc) public view returns (bool) {
@@ -211,40 +212,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     }
 
     // usersFinance Proxy
-    function makePayment(address _from, address _to, uint32 _cent) public onlyOwner {
-        usersFinance.makePayment(_from, _to, _cent);
-    }
-
-    // function getPayTarif(
-    //     address _acc,
-    //     uint256 _buyIndex
-    // ) public view returns (uint256) {
-    //     return users[_acc].buyHistory[_buyIndex].tarif;
-    // }
-
-    // function isPayFixed(
-    //     address _acc,
-    //     uint256 _buyIndex
-    // ) public view returns (bool) {
-    //     return usersFinance.isRejected(_acc, _buyIndex)
-    //         // !TarifDataLib.isRejected(
-    //         //     users[_acc].buyHistory[_buyIndex].tarif
-    //         // ) &&
-    //         // !TarifDataLib.isComsaTaken(
-    //         //     users[_acc].buyHistory[_buyIndex].tarif
-    //         // ) &&
-    //         || block.timestamp - users[_acc].buyHistory[_buyIndex].timestamp >
-    //         48 * 3600;
-    // }
-
-    // function getReferals(address user) public view returns (address[] memory) {
-    //     return users[user].referals;
-    // }
-
-    // function setComsaTaken(address _acc, uint256 _buyIndex) public onlyOwner {
-    //     users[_acc].buyHistory[_buyIndex].tarif = TarifDataLib.setComsaTaken(
-    //         users[_acc].buyHistory[_buyIndex].tarif
-    //     );
+    // function makePayment(address _from, address _to, uint32 _cent) public onlyOwner {
+    //     usersFinance.makePayment(_from, _to, _cent);
     // }
 
     function getLastBuyTime(address _acc) public view returns(uint256) {
@@ -254,19 +223,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     function setLastBuyTime(address _acc, uint256 _timestamp) public {
         lastBuyAt[_acc] = _timestamp;
     }
-
-    // function getMentor(address _acc) public view returns (address) {
-    //     return users[_acc].mentor;
-    // }
-
-    // function setMentor(address _mentor) public {
-    //     require(_mentor != address(0) && msg.sender != _mentor);
-    //     require(users[msg.sender].mentor == address(0));
-
-    //     registeredUsers.push(msg.sender);
-    //     users[msg.sender].mentor = _mentor;
-    //     users[_mentor].referals.push(msg.sender);
-    // }
 
     function getUsage(address _acc) public view returns (UsageRec memory) {
         return usage[_acc];
@@ -279,10 +235,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     function getLevel(address _acc) public view returns(uint16) {
         return usage[_acc].level;
     }
-
-    // function setUsage(address _acc, uint64 _usage) public onlyOwner {
-    //     usage[_acc] = _usage;
-    // }
 
     function hasCInviteBonus(address _acc) public view returns (bool) {
         return cTarifs[_acc].gotInviteBonus;

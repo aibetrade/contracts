@@ -1,5 +1,7 @@
 const { TarifData } = require("../utils/tarif");
-const { init, buyTarif, partnerTarifs, mustFail, userHasPTarif, span49h, makeBalancer, span31d, maxClientTarif } = require("./utils");
+const { buyTarif, makeBalancer } = require("./utils-finance");
+const { init, mustFail, span49h, span31d, } = require("./utils-system");
+const { partnerTarifs, userHasPTarif, maxClientTarif } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Can buy any partner tarif (at start)", async function () {
@@ -14,8 +16,6 @@ module.exports = () => {
         
         assert.equal(diff.bals[usersFinance.address], partnerTarifs[1].price, "Did not take money from user")
         assert.equal(diff.bals[uAcc], -partnerTarifs[1].price, "Did not freeze money")
-
-        bal.printDiff()
     })
 
     it("Can NOT buy same or another partner tarif before fill", async function () {
@@ -37,7 +37,7 @@ module.exports = () => {
     })
 
     it("Can buy same OR better tarif after fill and 48h", async function () {
-        const { uAcc, usersTarifsStore } = await init();
+        const { uAcc, usersTarifsStore, usersFinance } = await init();
 
         await span49h();
         await usersTarifsStore.adminSetFilled(uAcc);
@@ -67,4 +67,16 @@ module.exports = () => {
 
         await buyTarif(partnerTarifs[3], uAcc)
     })
+
+    // it("Can buy partner tarif after client", async function () {
+    //     const { uAcc, usersTarifsStore } = await init();
+
+    //     await buyTarif(maxClientTarif(), uAcc)
+    //     await usersTarifsStore.adminSetFilled(uAcc);
+    //     await mustFail(buyTarif(partnerTarifs[3], uAcc))
+        
+    //     await buyTarif(maxClientTarif(), uAcc)
+
+    //     await buyTarif(partnerTarifs[3], uAcc)
+    // })    
 }
