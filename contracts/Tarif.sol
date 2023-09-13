@@ -22,8 +22,13 @@ contract TarifsStoreBase is OnlyOwner {
         return tarifs;
     }
 
-    function setAll(uint256[] memory _tarifs) public onlyOwner {
-        tarifs = _tarifs;
+    function setAll(uint256[] calldata _tarifs) public onlyOwner {
+        tarifs = new uint256[](0);
+        for (uint8 i = 0; i < _tarifs.length; i++) {
+            tarifs.push(_tarifs[i]); // if (TarifDataLib.tarifKey(tarifs[i]) == key) return true;
+        }
+
+        // tarifs = _tarifs;
     }
 
     // // Static tarif data (not changable)

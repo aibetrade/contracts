@@ -6,14 +6,21 @@ var UsersTarifsStore = artifacts.require("UsersTarifsStore");
 var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
 
-const conf = require('./conf.json')
+const { writeFileSync } = require('fs');
+const conf = require('./conf.json');
 
-module.exports = async function (deployer) {
-  await deployer.deploy(ERC20Token, "ERC20", "ERC20", 4, BigInt(10 ** (8 + 16)));
-  const erc20 = await ERC20Token.deployed();
+module.exports = async function(deployer) {
+  // return
+  let erc20Address = conf.erc20
+  if (!erc20Address){
+    console.log("Deploy erc20")
+    await deployer.deploy(ERC20Token, "ERC20", "ERC20", 4, BigInt(10 ** (8 + 16)));
+    const erc20 = await ERC20Token.deployed();
+    erc20Address = erc20.address
+  }
 
   // --- Libs
-  await deployer.deploy(TarifDataLib);
+  await deployer.deploy(TarifDataLib);  
 
   await deployer.link(TarifDataLib, TarifUsageLib);
   await deployer.deploy(TarifUsageLib);
@@ -25,7 +32,7 @@ module.exports = async function (deployer) {
   // --- Finance
   await deployer.link(TarifDataLib, UsersFinanceStore);
   await deployer.link(TarifUsageLib, UsersFinanceStore);
-  await deployer.deploy(UsersFinanceStore, erc20.address);
+  await deployer.deploy(UsersFinanceStore, erc20Address);
   const usersFinance = await UsersFinanceStore.deployed()
 
   // --- Users tarifs
@@ -37,7 +44,6 @@ module.exports = async function (deployer) {
 
   await deployer.link(TarifDataLib, Referal);
   await deployer.link(TarifUsageLib, Referal);
-  // await deployer.deploy(Referal, erc20.address, UsersTarifsStore.address, usersFinance.address);
   await deployer.deploy(Referal, UsersTarifsStore.address, usersTreeStore.address);
 
   const referal = await Referal.deployed();
@@ -50,7 +56,8 @@ module.exports = async function (deployer) {
   await usersTarifsStore.appendOwner(referal.address)
   await usersFinance.appendOwner(referal.address)
 
-  console.log('erc20.address', erc20.address)
+  // console.log('erc20.address', erc20Address)
   console.log('referal.address', referal.address)
-  console.log('UsersTarifsStore.address', usersTarifsStore.address)
+
+  writeFileSync(__dirname + '/deploy.json', JSON.stringify({...conf, erc20: erc20Address, referal: referal.address}, null, 2))
 };

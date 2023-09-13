@@ -55,6 +55,9 @@ module.exports = () => {
 
         await bal.append()
         console.log(bal.diff().ext2)
+
+        const pays = await usersFinance.getPayHistory(m1Acc)
+        console.log(pays)
     })
 
     it("Set all pTarif 3", async function () {

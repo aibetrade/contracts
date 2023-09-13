@@ -36,7 +36,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     mapping(address => RollbackStruct) public rollbacks;
     mapping(address => bool) public registered;
     mapping(address => UsageRec) public usage;
-    mapping(address => uint256) public lastBuyAt;
 
     UsersFinanceStore public usersFinance;
 
@@ -47,7 +46,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     // --- Admin section ---
     function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
         cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, true);
-        lastBuyAt[_acc] = 0;
     }
 
     function adminSetPTarif(address _acc, uint256 _pTarif, uint8 level) public onlyOwner {
@@ -56,12 +54,10 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             level * TarifDataLib.getNumSlots(_pTarif),
             level * TarifDataLib.getNumLVSlots(_pTarif),
             level, 0);
-        lastBuyAt[_acc] = 0;
     }
 
     function adminSetRegistered(address _acc) public onlyOwner {
         registered[_acc] = true;
-        lastBuyAt[_acc] = 0;
     }
 
     function adminFillSlots(address _acc) public onlyOwner {
@@ -211,19 +207,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         usersFinance.rejectBuy(msg.sender);
     }
 
-    // usersFinance Proxy
-    // function makePayment(address _from, address _to, uint32 _cent) public onlyOwner {
-    //     usersFinance.makePayment(_from, _to, _cent);
-    // }
-
-    function getLastBuyTime(address _acc) public view returns(uint256) {
-        return lastBuyAt[_acc];
-    }
-
-    function setLastBuyTime(address _acc, uint256 _timestamp) public {
-        lastBuyAt[_acc] = _timestamp;
-    }
-
     function getUsage(address _acc) public view returns (UsageRec memory) {
         return usage[_acc];
     }
@@ -289,6 +272,7 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     function register(address _acc) public onlyOwner {
         registered[_acc] = true;
         usage[_acc].level = 1;
+        cTarifs[_acc].boughtAt = block.timestamp;
     }
 
     function cTarifExists(uint256 _tarif) public view returns (bool) {

@@ -3,6 +3,7 @@ const { init } = require("./utils-system");
 module.exports = () => {
 	it("Created succefully", async function () {
 		const { referal, accounts } = await init();
+		console.log(300)
 
 		console.log(referal.address, accounts)
 	})

@@ -6,32 +6,34 @@ var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
 
 const { time } = require('@openzeppelin/test-helpers');
-const { web3 } = require('@openzeppelin/test-helpers/src/setup');
+
 const conf = require("../migrations/conf.json")
+const deploy = require("../migrations/deploy.json")
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 const oneAddress = '0x0000000000000000000000000000000000000001';
 
 let stack = null
 
-
 async function init(isNew = false) {
     if (isNew || !stack) {
-        const accounts = await web3.eth.getAccounts()
-        const referal = await Referal.deployed()
+        const accounts = await web3.eth.getAccounts()        
+        const referal = await Referal.at(deploy.referal)
 
         const usersTarifsStore = await UsersTarifsStore.at(await referal.usersTarifsStore())
+        const usersFinance = await UsersFinanceStore.at(await referal.usersFinance())
 
         stack = {
             ...conf,
 
             referal,
-            erc20: await ERC20Token.deployed(),
+            // erc20: await ERC20Token.deployed(),
+            erc20: await ERC20Token.at(await usersFinance.erc20()),
             accounts,
             usersTarifsStore,
             cliTarifs: await TarifsStoreBase.at(await usersTarifsStore.clientTarifs()),
             parTarifs: await TarifsStoreBase.at(await usersTarifsStore.partnerTarifs()),
-            usersFinance: await UsersFinanceStore.at(await referal.usersFinance()),
+            usersFinance,
             usersTree: await UsersTreeStore.at(await referal.usersTree()),
 
             uAcc: accounts[1],

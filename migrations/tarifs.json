@@ -4,7 +4,7 @@
             "name": "Старт Х1",
             "data": {
                 "key": 1,
-                "price": 10
+                "price": 11
             },
             "maxBots": 1,
             "bidBonus": 4,

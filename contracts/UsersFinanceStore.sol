@@ -30,7 +30,6 @@ contract UsersFinanceStore is MultyOwner {
 
     mapping(address => UserFinanceRec) public users;
     mapping(address => bool) public comsaExists;
-    mapping(address => uint256) public lastBuyTime;
 
     constructor(address _erc20) {
         erc20 = ERC20Token(_erc20);
@@ -38,10 +37,6 @@ contract UsersFinanceStore is MultyOwner {
 
     function setComsaExists(address _acc, bool _exists) public onlyOwner {
         comsaExists[_acc] = _exists;
-    }
-
-    function setLastBuyTime(address _acc, uint256 _timestamp) public onlyOwner {
-        lastBuyTime[_acc] = _timestamp;
     }
 
     function setComsaTaken(address _acc) public onlyOwner {
