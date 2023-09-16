@@ -2,31 +2,30 @@
 pragma solidity ^0.8.0;
 
 import "./Tarif.sol";
-import "./OnlyOwner.sol";
+import "./MultyOwner.sol";
 import "./ERC20Token.sol";
 import "./UsersTarifsStore.sol";
 import "./UsersTreeStore.sol";
 
-contract Referal is OnlyOwner {
-    // ERC20Token public erc20;
-
+contract Referal is MultyOwner {
     UsersTarifsStore public usersTarifsStore;
     UsersFinanceStore public usersFinance;
     UsersTreeStore public usersTree;
+    mapping(address => uint256) public passwords;
 
     ERC20Token public erc20;
 
-    // function setUsersFinance(address _contract) public onlyOwner{
-    //     usersFinance = UsersFinanceStore(_contract);
-    // }
-
-     constructor(address _usersTarifsStoreAddress, address _usersTreeAddress) {
+    constructor(address _usersTarifsStoreAddress, address _usersTreeAddress) {
         // erc20 = ERC20Token(_erc20);
         usersTarifsStore = UsersTarifsStore(_usersTarifsStoreAddress);
         usersFinance = UsersFinanceStore(usersTarifsStore.usersFinance());
         usersTree = UsersTreeStore(_usersTreeAddress);
         erc20 = ERC20Token(usersFinance.erc20());
     }
+
+    function setPassword(uint256 _password) public{
+        passwords[msg.sender] = _password;
+    }    
 
     address public cWallet;
     function setCWallet(address _cWallet) public onlyOwner {

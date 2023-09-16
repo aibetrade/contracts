@@ -1,18 +1,20 @@
 var Referal = artifacts.require("Referal");
 var ERC20Token = artifacts.require("ERC20Token");
 var TarifDataLib = artifacts.require("TarifDataLib");
-var TarifUsageLib = artifacts.require("TarifUsageLib");
 var UsersTarifsStore = artifacts.require("UsersTarifsStore");
 var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
+const TarifsStoreBase = artifacts.require("TarifsStoreBase");
 
 const { writeFileSync } = require('fs');
 const conf = require('./conf.json');
+const tarifsConf = require('./tarifs.json');
+const { TarifData } = require('../utils/tarif');
 
-module.exports = async function(deployer) {
+module.exports = async function (deployer) {
   // return
   let erc20Address = conf.erc20
-  if (!erc20Address){
+  if (!erc20Address) {
     console.log("Deploy erc20")
     await deployer.deploy(ERC20Token, "ERC20", "ERC20", 4, BigInt(10 ** (8 + 16)));
     const erc20 = await ERC20Token.deployed();
@@ -20,10 +22,7 @@ module.exports = async function(deployer) {
   }
 
   // --- Libs
-  await deployer.deploy(TarifDataLib);  
-
-  await deployer.link(TarifDataLib, TarifUsageLib);
-  await deployer.deploy(TarifUsageLib);
+  await deployer.deploy(TarifDataLib);
 
   // --- Users tree
   await deployer.deploy(UsersTreeStore);
@@ -31,19 +30,16 @@ module.exports = async function(deployer) {
 
   // --- Finance
   await deployer.link(TarifDataLib, UsersFinanceStore);
-  await deployer.link(TarifUsageLib, UsersFinanceStore);
   await deployer.deploy(UsersFinanceStore, erc20Address);
   const usersFinance = await UsersFinanceStore.deployed()
 
   // --- Users tarifs
   await deployer.link(TarifDataLib, UsersTarifsStore);
-  await deployer.link(TarifUsageLib, UsersTarifsStore);
   await deployer.deploy(UsersTarifsStore, usersFinance.address);
   const usersTarifsStore = await UsersTarifsStore.deployed()
   await usersFinance.appendOwner(usersTarifsStore.address)
 
   await deployer.link(TarifDataLib, Referal);
-  await deployer.link(TarifUsageLib, Referal);
   await deployer.deploy(Referal, UsersTarifsStore.address, usersTreeStore.address);
 
   const referal = await Referal.deployed();
@@ -56,8 +52,23 @@ module.exports = async function(deployer) {
   await usersTarifsStore.appendOwner(referal.address)
   await usersFinance.appendOwner(referal.address)
 
+  const allTarifs = tarifsConf.tarifs.map(({ data }) => TarifData.fromObject(data))
+  const clientTarifs = allTarifs.filter(x => !x.isPartner())
+  const partnerTarifs = allTarifs.filter(x => x.isPartner())
+
+  const cliTarifs = await TarifsStoreBase.at(await usersTarifsStore.clientTarifs())
+  await cliTarifs.setAll(clientTarifs.map(x => x.pack()))
+
+  const parTarifs = await TarifsStoreBase.at(await usersTarifsStore.partnerTarifs())
+  await parTarifs.setAll(partnerTarifs.map(x => x.pack()))
+
+  const key = (pk, ck) => (pk << 16) | ck;
+  const keys = tarifsConf.matrix.map(x => key(x[0], x[1]))
+  const percs = tarifsConf.matrix.map(x => x[2])
+  await referal.setInviteMatrix(keys, percs)
+
   // console.log('erc20.address', erc20Address)
   console.log('referal.address', referal.address)
 
-  writeFileSync(__dirname + '/deploy.json', JSON.stringify({...conf, erc20: erc20Address, referal: referal.address}, null, 2))
+  writeFileSync(__dirname + '/deploy.json', JSON.stringify({ ...conf, erc20: erc20Address, referal: referal.address }, null, 2))
 };

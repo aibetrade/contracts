@@ -1,21 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./OnlyOwner.sol";
-import "./TarifUsageLib.sol";
+import "./MultyOwner.sol";
+import "./TarifDataLib.sol";
 
-// struct Tarif {
-//     uint16 key;
-//     uint16 price;
-//     uint16 numSlots;
-//     uint16 comsa;
-//     uint16 hasCompess;
-//     uint16 numLVSlots;
-//     uint16 LV;
-//     uint16 fullNum;
-// }
-
-contract TarifsStoreBase is OnlyOwner {
+contract TarifsStoreBase is MultyOwner {
     uint256[] public tarifs;
 
     function getAll() public view returns (uint256[] memory) {
@@ -60,8 +49,8 @@ contract TarifsStore {
         clientTarifs = new TarifsStoreBase();
         partnerTarifs = new TarifsStoreBase();
 
-        clientTarifs.setOwner(msg.sender);
-        partnerTarifs.setOwner(msg.sender);
+        clientTarifs.appendOwner(msg.sender);
+        partnerTarifs.appendOwner(msg.sender);
     }
 
     function isT1BetterOrSameT2(

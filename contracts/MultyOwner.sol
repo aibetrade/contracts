@@ -2,22 +2,28 @@
 pragma solidity ^0.8.0;
 
 contract MultyOwner {
-    mapping(address => bool) public allowed;
+    mapping(address => bool) public owners;
+
+    event OwnerAdded(address);
+    event OwnerRemoved(address);
 
     function appendOwner(address _owner) virtual public onlyOwner{
-        allowed[_owner] = true;
+        owners[_owner] = true;
+        emit OwnerAdded(_owner);
     }
 
     function removeOwner(address _owner) virtual public onlyOwner{
-        allowed[_owner] = false;
+        owners[_owner] = false;
+        emit OwnerRemoved(_owner);
     }
 
     constructor() {
-        allowed[msg.sender] = true;
+        owners[msg.sender] = true;
+        emit OwnerAdded(msg.sender);
     }
 
     modifier onlyOwner() {
-        require(allowed[msg.sender], "Only the owner can call this function.");
+        require(owners[msg.sender], "Only the owner can call this function.");
         _;
     }
 }

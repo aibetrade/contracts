@@ -71,6 +71,7 @@ module.exports = {
   networks: {
     aibe: loadNet('aibe'),
     bsctest: loadNet('bsctest'),
+    mumbai: loadNet('mumbai')
   },
 
   // plugins: ["truffle-contract-size"],
