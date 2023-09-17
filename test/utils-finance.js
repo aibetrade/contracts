@@ -1,3 +1,4 @@
+const { TarifData } = require("../utils/tarif");
 const { init } = require("./utils-system");
 const { getUsage, getRollback, userHasCTarif, userHasPTarif } = require("./utils-tarifs");
 
@@ -8,8 +9,8 @@ async function getNextBuyInfo(tarif, acc) {
     let level = 1
 
     if (tarif.isPartner()) {
-        buyCount = Number(await usersTarifsStore.getNextBuyCount(acc, tarif.pack()))
-        level = Number(await usersTarifsStore.getNextLevel(acc, tarif.pack()))
+        buyCount = Number(await usersTarifsStore.getNextBuyCount(acc, tarif.key))
+        level = Number(await usersTarifsStore.getNextLevel(acc, tarif.key))
     }
 
     return {
@@ -71,9 +72,9 @@ async function buyTarif(tarif, acc = null) {
     assert.equal(await fromErc20(approved), price);
 
     if (tarif.isPartner())
-        await referal.buyPartnerTarif(tarif.pack(), { from: acc })
+        await referal.buyPartnerTarif(tarif.key, { from: acc })
     else
-        await referal.buyClientTarif(tarif.pack(), { from: acc })
+        await referal.buyClientTarif(tarif.key, { from: acc })
     // === Buy logic ===
 
     await bal.append("after")
@@ -121,6 +122,19 @@ async function buyTarif(tarif, acc = null) {
         assert.equal(usageAfter.level, buyInfoBefore.level, "Give incorrect level")
         assert.equal(usageAfter.freeSlots - usageBefore.freeSlots, tarif.numSlots * buyInfoBefore.buyCount, "Give incorrect slots")
         assert.equal(usageAfter.freeLVSlots - usageBefore.freeLVSlots, tarif.numLVSlots * buyInfoBefore.buyCount, "Give incorrect LV slots")
+    }
+
+    // --- check current tarif is equal to bought
+    {
+        if (tarif.isPartner()) {
+            const upTarifAfter = await usersTarifsStore.pTarifs(acc)
+            const upTarifAfter2 = TarifData.fromPack(upTarifAfter.tarif)
+            assert.equal(upTarifAfter.tarif, tarif.pack())
+        }
+        else{
+            const ucTarifAfter = await usersTarifsStore.cTarifs(acc)
+            assert.equal(ucTarifAfter.tarif, tarif.pack())
+        }
     }
 }
 

@@ -134,11 +134,11 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         }));
     }
 
-    function getNextBuyCount(address _acc, uint256 _tarif) public view returns(uint16) {
+    function getNextBuyCount(address _acc, uint16 _tarifKey) public view returns(uint16) {
         if (isPartnerTarifActive(_acc)){            
-            if (!isT1BetterOrSameT2(_tarif, pTarifs[_acc].tarif)) return 0;
+            if (!isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(pTarifs[_acc].tarif))) return 0;
 
-            if (TarifDataLib.tarifKey(pTarifs[_acc].tarif) == TarifDataLib.tarifKey(_tarif))
+            if (TarifDataLib.tarifKey(pTarifs[_acc].tarif) == _tarifKey)
                 return 1;            
             else
                 return usage[_acc].level;
@@ -146,11 +146,11 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         return 1;
     }
 
-    function getNextLevel(address _acc, uint256 _tarif) public view returns(uint16) {
+    function getNextLevel(address _acc, uint16 _tarifKey) public view returns(uint16) {
         if (isPartnerTarifActive(_acc)){            
-            if (!isT1BetterOrSameT2(_tarif, pTarifs[_acc].tarif)) return 0;
+            if (!isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(pTarifs[_acc].tarif))) return 0;
 
-            if (TarifDataLib.tarifKey(pTarifs[_acc].tarif) == TarifDataLib.tarifKey(_tarif))
+            if (TarifDataLib.tarifKey(pTarifs[_acc].tarif) == _tarifKey)
                 return usage[_acc].level + 1;            
             else
                 return usage[_acc].level;
@@ -275,12 +275,12 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         cTarifs[_acc].boughtAt = block.timestamp;
     }
 
-    function cTarifExists(uint256 _tarif) public view returns (bool) {
-        return clientTarifs.exists(_tarif);
+    function cTarifExists(uint16 _tarifKey) public view returns (bool) {
+        return clientTarifs.exists(_tarifKey);
     }
 
-    function pTarifExists(uint256 _tarif) public view returns (bool) {
-        return partnerTarifs.exists(_tarif);
+    function pTarifExists(uint16 _tarifKey) public view returns (bool) {
+        return partnerTarifs.exists(_tarifKey);
     }
 
     function canBuyPTarif(address _acc) public view returns (bool) {

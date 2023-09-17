@@ -25,12 +25,19 @@ contract TarifsStoreBase is MultyOwner {
         return tarifs.length;
     }
 
-    function exists(uint256 _tarif) public view returns (bool) {
-        uint16 key = TarifDataLib.tarifKey(_tarif);
+    function exists(uint16 _tarifKey) public view returns (bool) {
         for (uint8 i = 0; i < tarifs.length; i++) {
-            if (TarifDataLib.tarifKey(tarifs[i]) == key) return true;
+            if (TarifDataLib.tarifKey(tarifs[i]) == _tarifKey) return true;
         }
         return false;
+    }
+
+    // // Static tarif data (not changable)
+    function tarif(uint16 _tarifKey) public view returns (uint256) {
+        for (uint8 i = 0; i < tarifs.length; i++) {
+            if (TarifDataLib.tarifKey(tarifs[i]) == _tarifKey) return tarifs[i];
+        }
+        return 0;
     }
 
     function isLast(uint256 _tarif) public view returns (bool) {
@@ -54,20 +61,20 @@ contract TarifsStore {
     }
 
     function isT1BetterOrSameT2(
-        uint256 _tarif1,
-        uint256 _tarif2
+        uint16 _tarifKey1,
+        uint16 _tarifKey2
     ) public view returns (bool) {
         bool t2Found = false;
-        uint16 k1 = TarifDataLib.tarifKey(_tarif1);
-        uint16 k2 = TarifDataLib.tarifKey(_tarif2);
+        // uint16 k1 = TarifDataLib.tarifKey(_tarif1);
+        // uint16 k2 = TarifDataLib.tarifKey(_tarif2);
 
-        if (k2 == 0) return true; // Any model better then none.
+        if (_tarifKey2 == 0) return true; // Any model better then none.
         // if (k1 == k2) return true;
 
         for (uint8 i = 0; i < partnerTarifs.tarifsCount(); i++) {
-            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == k2)
+            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == _tarifKey2)
                 t2Found = true;
-            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == k1)
+            if (TarifDataLib.tarifKey(partnerTarifs.tarifs(i)) == _tarifKey1)
                 return t2Found;
         }
 

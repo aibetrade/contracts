@@ -196,18 +196,23 @@ contract Referal is MultyOwner {
         return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
     }
 
-    function buyClientTarif(uint256 _tarif) public {
-        require(usersTarifsStore.cTarifExists(_tarif) && canBuy(msg.sender), "E117");
+    function buyClientTarif(uint16 _tarifKey) public {
+        TarifsStoreBase clientTarifs = usersTarifsStore.clientTarifs();
+        uint256 tarif = clientTarifs.tarif(_tarifKey);
+        require(tarif != 0 && canBuy(msg.sender), "E117");
 
         // Если предыдущую комсу не забрали, заберем ее.
         if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
-        usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif), msg.sender);
-        usersTarifsStore.newClientTarif(msg.sender, _tarif);        
+        usersFinance.freezeMoney(TarifDataLib.getPrice(tarif), msg.sender);
+        usersTarifsStore.newClientTarif(msg.sender, tarif);        
         processComsa(msg.sender);
     }
 
-    function buyPartnerTarif(uint256 _tarif) public {
+    function buyPartnerTarif(uint16 _tarifKey) public {
+        TarifsStoreBase partnerTarifs = usersTarifsStore.partnerTarifs();
+        uint256 tarif = partnerTarifs.tarif(_tarifKey);
+
         require(
             usersTarifsStore.registered(msg.sender)
             && usersTarifsStore.hasActiveMaxClientTarif(msg.sender)
@@ -217,24 +222,24 @@ contract Referal is MultyOwner {
         // Если предыдущую комсу не забрали, заберем ее.
         if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
-        uint16 buyCount = 1;
-        uint16 level = 1;
+        uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
+        uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
 
-        if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
-            require(usersTarifsStore.isT1BetterOrSameT2(_tarif, usersTarifsStore.pTarif(msg.sender)));
+        // if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
+        //     require(usersTarifsStore.isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender))));
 
-            buyCount = usersTarifsStore.getLevel(msg.sender);
-            if (TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender)) == TarifDataLib.tarifKey(_tarif)){
-                level = buyCount + 1;
-                buyCount = 1;                
-            }
-            else
-                level = buyCount;
-        }
+        //     buyCount = usersTarifsStore.getLevel(msg.sender);
+        //     if (TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender)) == _tarifKey){
+        //         level = buyCount + 1;
+        //         buyCount = 1;                
+        //     }
+        //     else
+        //         level = buyCount;
+        // }
 
-        usersFinance.freezeMoney(TarifDataLib.getPrice(_tarif) * buyCount, msg.sender);
+        usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
 
         // Если есть невзятая комиссия, то забрать ее. Иначе просто запомнить текущий платеж.
-        usersTarifsStore.newPartnerTarif(msg.sender, _tarif, buyCount, level);
+        usersTarifsStore.newPartnerTarif(msg.sender, tarif, buyCount, level);
     }
 }

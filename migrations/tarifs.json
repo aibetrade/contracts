@@ -4,7 +4,7 @@
             "name": "Старт Х1",
             "data": {
                 "key": 1,
-                "price": 11
+                "price": 10
             },
             "maxBots": 1,
             "bidBonus": 4,
@@ -33,6 +33,7 @@
             "comsaBonus": 4,
             "maxDeposit": 50000
         },
+
         {
             "name": "Matrix Silver",
             "data": {
