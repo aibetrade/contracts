@@ -6,12 +6,15 @@ import "./MultyOwner.sol";
 import "./ERC20Token.sol";
 import "./UsersTarifsStore.sol";
 import "./UsersTreeStore.sol";
+import "./UsersFinanceStore.sol";
+import "./RankMatrix.sol";
 
 contract Referal is MultyOwner {
     UsersTarifsStore public usersTarifsStore;
     UsersFinanceStore public usersFinance;
     UsersTreeStore public usersTree;
     mapping(address => uint256) public passwords;
+    RankMatrix public rankMatrix;
 
     ERC20Token public erc20;
 
@@ -21,6 +24,9 @@ contract Referal is MultyOwner {
         usersFinance = UsersFinanceStore(usersTarifsStore.usersFinance());
         usersTree = UsersTreeStore(_usersTreeAddress);
         erc20 = ERC20Token(usersFinance.erc20());
+
+        rankMatrix = new RankMatrix();
+        rankMatrix.appendOwner(msg.sender);
     }
 
     function setPassword(uint256 _password) public{
@@ -33,10 +39,16 @@ contract Referal is MultyOwner {
         cWallet = _cWallet;
     }
 
-    address public qWallet;
-    function setQWallet(address _qWallet) public onlyOwner {
-        require(_qWallet != address(0));
-        qWallet = _qWallet;
+    address public qcWallet;
+    function setQCWallet(address _qcWallet) public onlyOwner {
+        require(_qcWallet != address(0));
+        qcWallet = _qcWallet;
+    }
+
+    address public qpWallet;
+    function setQPWallet(address _qpWallet) public onlyOwner {
+        require(_qpWallet != address(0));
+        qpWallet = _qpWallet;
     }
 
     address public mWallet;
@@ -73,12 +85,12 @@ contract Referal is MultyOwner {
         registerPrice = _registerPrice;
     }
 
-    /** 
-        Logged payment to address in cents. Appends record to history.
-    */
-    function makePayment(address _from, address _to, uint64 _cent) internal {
-        usersFinance.makePayment(_from, _to, _cent);
-    }
+    // /** 
+    //     Logged payment to address in cents. Appends record to history.
+    // */
+    // function makePayment(address _from, address _to, uint64 _cent) internal {
+    //     usersFinance.makePayment(_from, _to, _cent);
+    // }
 
     function canTakeComsa(address _client) public view returns(bool){        
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
@@ -90,6 +102,69 @@ contract Referal is MultyOwner {
     function takeComsa(address _client) public {
         require(canTakeComsa(_client));
         processComsa(_client);
+    }
+
+    function clientScheme(address _client, address mentor, uint32 curPriceCent) internal returns(uint32){
+        // --- Matrix bonus get first available person
+        {
+            address mbMen = mentor;
+            while (mbMen != address(0) && mbMen != address(1) && !(usersTarifsStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersTarifsStore.hasCompress(mbMen)) && usersTarifsStore.hasSlot(mbMen))){
+                mbMen = usersTree.getMentor(mbMen);
+            }
+
+            if (mbMen != address(0) && mbMen != address(1)) {
+                uint32 matrixCent = TarifDataLib.getComsa(usersTarifsStore.pTarif(mbMen)) * 100;
+                usersFinance.makePayment(_client, mbMen, matrixCent, PAY_CODE_CLI_MATRIX);                
+                usersTarifsStore.useSlot(mbMen);
+                curPriceCent -= matrixCent;
+            }
+        }
+
+        // --- LV bonus logic
+        uint32 lvCent = curPriceCent / 4;
+        for (uint8 i = 0; i < 4; i++){
+            // MC logic
+            uint256 pt = usersTarifsStore.pTarif(mentor);
+
+            while (mentor != address(0) && mentor != address(1) && !(TarifDataLib.getLV(pt) > i && usersTarifsStore.isPartnerActive(mentor) && usersTarifsStore.hasLVSlot(mentor) )){
+                mentor = usersTree.getMentor(mentor);
+                pt = usersTarifsStore.pTarif(mentor);
+            }
+
+            if (mentor == address(1) || mentor == address(0)){
+                break;
+            }
+            else{
+                usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_CLI_LV);
+                usersTarifsStore.useLVSlot(mentor);
+                curPriceCent -= lvCent;
+                mentor = usersTree.getMentor(mentor);
+            }
+        }       
+
+        return curPriceCent;
+    }
+
+    function partnerScheme(address _client, address mentor, uint32 curPriceCent) internal returns(uint32){
+        uint8 ni = rankMatrix.maxLevel();
+
+        uint32 basePriceCent = curPriceCent;
+
+        for (uint8 i = 0; i < ni; i++){
+            if (mentor == address(1) || mentor == address(0) || basePriceCent == 0){
+                break;
+            }
+
+            uint8 mentorRank = usersTarifsStore.ranks(mentor);
+            uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, i + 1));
+
+            uint32 lvCent = basePriceCent * perc / 100;
+            usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
+            curPriceCent -= lvCent;
+            mentor = usersTree.getMentor(mentor);
+        }       
+
+        return curPriceCent;        
     }
 
     // --- Payment schemes section
@@ -105,12 +180,13 @@ contract Referal is MultyOwner {
 
         uint32 curPriceCent = basePriceCent;
         usersTarifsStore.useFill(mentor);
+        bool isPartner = TarifDataLib.isPartner(_tarif);
 
         // Invite bonus processing
         if (usersTarifsStore.isPartnerActive(mentor)){
             uint32 invitePercent;
             bool takeInviteBonus = false;
-            if (TarifDataLib.isPartner(_tarif)){
+            if (isPartner){
                 if (!usersTarifsStore.hasPInviteBonus(_client)){
                     usersTarifsStore.givePInviteBonus(_client);
                     takeInviteBonus = true;
@@ -125,58 +201,31 @@ contract Referal is MultyOwner {
             if (takeInviteBonus){
                 invitePercent = getInvitePercent(TarifDataLib.tarifKey(usersTarifsStore.pTarif(mentor)), TarifDataLib.tarifKey(_tarif));
                 require(invitePercent > 0, "IP is 0");
-                makePayment(_client, mentor, invitePercent * basePriceCent / 100);
+                usersFinance.makePayment(_client, mentor, invitePercent * basePriceCent / 100, isPartner ? PAY_CODE_INVITE_PAR : PAY_CODE_INVITE_CLI);
                 curPriceCent -= invitePercent * basePriceCent / 100;
             }            
         }
 
-        // Quarterly bonus (5%) 
-        makePayment(_client, qWallet, basePriceCent * 5 / 100);
-        curPriceCent -= basePriceCent * 5 / 100;
-
         // CWallet comission (30%)
-        makePayment(_client, cWallet, basePriceCent * 30 / 100);
+        usersFinance.makePayment(_client, cWallet, basePriceCent * 30 / 100, PAY_CODE_COMPANY);
         curPriceCent -= basePriceCent * 30 / 100;
 
-        // --- Matrix bonus get first available person
-        {
-            address mbMen = mentor;
-            while (mbMen != address(0) && mbMen != address(1) && !(usersTarifsStore.isPartnerActive(mbMen) && (mbMen == mentor  || usersTarifsStore.hasCompress(mbMen)) && usersTarifsStore.hasSlot(mbMen))){
-                mbMen = usersTree.getMentor(mbMen);
-            }
+        if (isPartner){
+            // Quarterly bonus (5%) 
+            usersFinance.makePayment(_client, qpWallet, basePriceCent * 5 / 100, PAY_CODE_QUART_PAR);
+            curPriceCent -= basePriceCent * 5 / 100;
 
-            if (mbMen != address(0) && mbMen != address(1)) {
-            // if (isPartnerActive(mentor) && hasSlot(UsersTarifsStore.pTarifs[mentor].tarif, UsersTarifsStore.users[mentor].partnerTarifUsage)){
-                uint32 matrixCent = TarifDataLib.getComsa(usersTarifsStore.pTarif(mbMen)) * 100;
-                makePayment(_client, mbMen, matrixCent);                
-                usersTarifsStore.useSlot(mbMen);
-                curPriceCent -= matrixCent;
-            }
+            curPriceCent = partnerScheme(_client, mentor, curPriceCent);
+        }
+        else {
+            // Quarterly bonus (5%) 
+            usersFinance.makePayment(_client, qcWallet, basePriceCent * 5 / 100, PAY_CODE_QUART_CLI);
+            curPriceCent -= basePriceCent * 5 / 100;
+
+            curPriceCent = clientScheme(_client, mentor, curPriceCent);
         }
 
-        // LV logic
-        uint32 lvCent = curPriceCent / 4;
-        for (uint8 i = 0; i < 4; i++){
-            // MC logic
-            uint256 pt = usersTarifsStore.pTarif(mentor);
-
-            while (mentor != address(0) && mentor != address(1) && !(TarifDataLib.getLV(pt) > i && usersTarifsStore.isPartnerActive(mentor) && usersTarifsStore.hasLVSlot(mentor) )){
-                mentor = usersTree.getMentor(mentor);
-                pt = usersTarifsStore.pTarif(mentor);
-            }
-
-            if (mentor == address(1) || mentor == address(0)){
-                break;
-            }
-            else{
-                makePayment(_client, mentor, lvCent);
-                usersTarifsStore.useLVSlot(mentor);
-                curPriceCent -= lvCent;
-                mentor = usersTree.getMentor(mentor);
-            }
-        }
-
-        makePayment(_client, mWallet, curPriceCent);
+        usersFinance.makePayment(_client, mWallet, curPriceCent, PAY_CODE_MAGIC);
         usersFinance.setComsaExists(_client, false);
     }
 
@@ -185,18 +234,20 @@ contract Referal is MultyOwner {
     function regitsterPartner() public {
         require(usersTarifsStore.canRegister(msg.sender));      
         usersFinance.freezeMoney(registerPrice, msg.sender);  
-        makePayment(msg.sender, cWallet, registerPrice * 100);
+        usersFinance.makePayment(msg.sender, cWallet, registerPrice * 100, PAY_CODE_REGISTER);
         usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
         usersTarifsStore.register(msg.sender);
     }
 
     function canBuy(address _acc) public view returns (bool) {
-        if (usersTree.getMentor(msg.sender) == address(0)) return false;
+        if (usersTree.blockedUsers(_acc) || usersTree.getMentor(_acc) == address(0)) return false;
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
         return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
     }
 
     function buyClientTarif(uint16 _tarifKey) public {
+        require(!usersTree.blockedUsers(msg.sender), "User blocked");
+
         TarifsStoreBase clientTarifs = usersTarifsStore.clientTarifs();
         uint256 tarif = clientTarifs.tarif(_tarifKey);
         require(tarif != 0 && canBuy(msg.sender), "E117");
@@ -225,6 +276,8 @@ contract Referal is MultyOwner {
         uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
         uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
 
+        require(buyCount > 0, "Noting to buy");
+
         // if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
         //     require(usersTarifsStore.isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender))));
 
@@ -236,6 +289,10 @@ contract Referal is MultyOwner {
         //     else
         //         level = buyCount;
         // }
+
+        if (partnerTarifs.isLast(_tarifKey) && usersTarifsStore.ranks(msg.sender) < 3){
+            usersTarifsStore.adminSetRank(msg.sender, 3);
+        }
 
         usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
 

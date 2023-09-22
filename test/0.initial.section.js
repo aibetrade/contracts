@@ -1,4 +1,4 @@
-const { init } = require("./utils-system");
+const { init, span49h } = require("./utils-system");
 
 module.exports = () => {
 	it("Created succefully", async function () {
@@ -8,7 +8,7 @@ module.exports = () => {
 
 	// Check can buy partner tarif
 	it("Get user test", async function () {
-		const { referal, usersTarifsStore, uAcc } = await init();
+		const { referal, usersTarifsStore, uAcc, usersTree } = await init();
 		const ucTarif = await usersTarifsStore.cTarifs(uAcc);
 		assert.equal(ucTarif.tarif, 0)
 		assert.equal(ucTarif.boughtAt, 0)

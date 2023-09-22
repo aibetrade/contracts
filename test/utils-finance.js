@@ -139,9 +139,9 @@ async function buyTarif(tarif, acc = null) {
 }
 
 async function prettyBalance(bal) {
-    const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
+    const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance } = await init();
     const dic = {
-        company: cWallet, quart: qWallet, magic: mWallet, finance: usersFinance.address,
+        company: cWallet, quartc: qcWallet, quartp: qpWallet, magic: mWallet, finance: usersFinance.address,
         uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc
     }
 
@@ -160,9 +160,9 @@ async function makeBalancer() {
         accs: [],
 
         async append(name = 'after') {
-            const { erc20, uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
+            const { erc20, uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance } = await init();
 
-            this.accs = [uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance.address]
+            this.accs = [uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance.address]
 
             const accInfo = async acc => {
                 const u = await getUsage(acc)
@@ -193,7 +193,8 @@ async function makeBalancer() {
             const rec = {
                 name,
                 company: await fromErc20(await erc20.balanceOf(cWallet)),
-                quart: await fromErc20(await erc20.balanceOf(qWallet)),
+                quartc: await fromErc20(await erc20.balanceOf(qcWallet)),
+                quartp: await fromErc20(await erc20.balanceOf(qpWallet)),
                 magic: await fromErc20(await erc20.balanceOf(mWallet)),
                 finance: await fromErc20(await erc20.balanceOf(usersFinance.address)),
 
@@ -241,7 +242,8 @@ async function makeBalancer() {
                 const diffRec = {
                     name: `${nameb} - ${namea}`,
                     company: dif(recb.company, reca.company),
-                    quart: dif(recb.quart, reca.quart),
+                    quartc: dif(recb.quartc, reca.quartc),
+                    quartp: dif(recb.quartp, reca.quartp),
                     magic: dif(recb.magic, reca.magic),
                     finance: dif(recb.finance, reca.finance),
 

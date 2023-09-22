@@ -5,10 +5,27 @@ import "./MultyOwner.sol";
 import "./Tarif.sol";
 import "./ERC20Token.sol";
 
+uint8 constant PAY_CODE_INVITE_CLI = 1;
+uint8 constant PAY_CODE_INVITE_PAR = 2;
+uint8 constant PAY_CODE_COMPANY = 3;
+uint8 constant PAY_CODE_QUART_CLI = 4;
+uint8 constant PAY_CODE_QUART_PAR = 5;
+uint8 constant PAY_CODE_MAGIC = 6;
+uint8 constant PAY_CODE_REGISTER = 7;
+
+uint8 constant PAY_CODE_CLI_MATRIX = 8;
+uint8 constant PAY_CODE_CLI_LV = 9;
+uint8 constant PAY_CODE_PAR_RANK = 10;
+
+// uint8 constant PAY_CODE_LV = 4;
+// uint8 constant PAY_CODE_TEAM = 5;
+
+
 struct PayHistoryRec {
     address from;
     uint256 timestamp;
     uint64 cents;
+    uint8 payCode;
 }
 
 struct BuyHistoryRec {
@@ -94,8 +111,8 @@ contract UsersFinanceStore is MultyOwner {
         erc20.transferFrom(_from, address(this), centToErc20(dollar * 100));
     }
 
-    function makePayment(address _from, address _to, uint64 _cent) public onlyOwner {
+    function makePayment(address _from, address _to, uint64 _cent, uint8 _payCode) public onlyOwner {
         erc20.transfer(_to, centToErc20(_cent));
-        addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from}));
+        addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from, payCode: _payCode}));
     }
 }

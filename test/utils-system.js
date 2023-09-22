@@ -4,6 +4,7 @@ var UsersTarifsStore = artifacts.require("UsersTarifsStore");
 var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
+const RankMatrix = artifacts.require("RankMatrix");
 
 const { time } = require('@openzeppelin/test-helpers');
 
@@ -35,6 +36,7 @@ async function init(isNew = false) {
             parTarifs: await TarifsStoreBase.at(await usersTarifsStore.partnerTarifs()),
             usersFinance,
             usersTree: await UsersTreeStore.at(await referal.usersTree()),
+            rankMatrix: await RankMatrix.at(await referal.rankMatrix()),
 
             uAcc: accounts[1],
             m1Acc: accounts[2],
@@ -58,19 +60,28 @@ async function mustFail(prom) {
     throw "Must fail"
 }
 
+const span = async time => {
+    const body = JSON.stringify({ method: "evm_increaseTime", params: [time] })
+    await fetch(web3.currentProvider.host, { method: "POST", body })
+    await fetch(web3.currentProvider.host, { method: "POST", body: JSON.stringify({ method: "evm_mine", params: [] }) })
+}
+
 const span49h = async () => {
-    await time.increase(49 * 3600);
-    await time.advanceBlock();
+    return span(49 * 3600)
+    // await time.increase(49 * 3600);
+    // await time.advanceBlock();
 }
 
 const span31d = async () => {
-    await time.increase(31 * 24 * 3600);
-    await time.advanceBlock();
+    return span(31 * 24 * 3600)
+    // await time.increase(31 * 24 * 3600);
+    // await time.advanceBlock();
 }
 
 const span366d = async () => {
-    await time.increase(366 * 24 * 3600);
-    await time.advanceBlock();
+    return span(366 * 24 * 3600)
+    // await time.increase(366 * 24 * 3600);
+    // await time.advanceBlock();
 }
 
 module.exports = {

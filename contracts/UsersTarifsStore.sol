@@ -36,6 +36,7 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     mapping(address => RollbackStruct) public rollbacks;
     mapping(address => bool) public registered;
     mapping(address => UsageRec) public usage;
+    mapping(address => uint8) public ranks;
 
     UsersFinanceStore public usersFinance;
 
@@ -72,22 +73,17 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         usage[_acc].filled = TarifDataLib.getFullNum(pTarifs[_acc].tarif);
     }
 
+    function adminSetRank(address _acc, uint8 _rank) public onlyOwner {        
+        ranks[_acc] = _rank;
+    }
 
     // === Admin section ===
-
-    // function getLastPay(address acc) public view returns (BuyHistoryRec memory) {
-    //     return users[acc].buyHistory[users[acc].buyHistory.length - 1];
-    // }
-
-    // function addUserPay(address acc, PayHistoryRec memory rec) public onlyOwner {
-    //     users[acc].payHistory.push(rec);
-    // }
 
     // --- is/has section
     function hasActiveMaxClientTarif(address user) public view returns (bool) {
         return
             isClientTarifActive(user) &&
-            clientTarifs.isLast(cTarifs[user].tarif);
+            clientTarifs.isLast(TarifDataLib.tarifKey(cTarifs[user].tarif));
     }
 
     function isPartnerActive(address _partner) public view returns (bool) {
@@ -168,8 +164,14 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         if (_tarif != REGISTRATION_KEY){
             pTarifs[_acc].tarif = _tarif;
             pTarifs[_acc].boughtAt = block.timestamp;
-            usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
-            usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
+            if (isPartnerTarifActive(_acc)){
+                usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
+                usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
+            }
+            else{
+                usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
+                usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
+            }
         }
 
         usersFinance.addUserBuy(_acc,

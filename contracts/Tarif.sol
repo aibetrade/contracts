@@ -16,8 +16,6 @@ contract TarifsStoreBase is MultyOwner {
         for (uint8 i = 0; i < _tarifs.length; i++) {
             tarifs.push(_tarifs[i]); // if (TarifDataLib.tarifKey(tarifs[i]) == key) return true;
         }
-
-        // tarifs = _tarifs;
     }
 
     // // Static tarif data (not changable)
@@ -40,11 +38,9 @@ contract TarifsStoreBase is MultyOwner {
         return 0;
     }
 
-    function isLast(uint256 _tarif) public view returns (bool) {
+    function isLast(uint16 _tarifKey) public view returns (bool) {
         if (tarifs.length == 0) return false;
-        return
-            TarifDataLib.tarifKey(_tarif) ==
-            TarifDataLib.tarifKey(tarifs[tarifs.length - 1]);
+        return _tarifKey == TarifDataLib.tarifKey(tarifs[tarifs.length - 1]);
     }
 }
 

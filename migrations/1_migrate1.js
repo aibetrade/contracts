@@ -5,11 +5,13 @@ var UsersTarifsStore = artifacts.require("UsersTarifsStore");
 var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
+const RankMatrix = artifacts.require("RankMatrix");
 
 const { writeFileSync } = require('fs');
 const conf = require('./conf.json');
 const tarifsConf = require('./tarifs.json');
 const { TarifData } = require('../utils/tarif');
+const { allRanks } = require('../test/utils-tarifs');
 
 module.exports = async function (deployer) {
   // return
@@ -46,7 +48,8 @@ module.exports = async function (deployer) {
   await referal.setRegisterPrice(conf.registerPrice)
   await referal.setQBonus(conf.qBonus)
   await referal.setCWallet(conf.cWallet)
-  await referal.setQWallet(conf.qWallet)
+  await referal.setQCWallet(conf.qcWallet)
+  await referal.setQPWallet(conf.qpWallet)
   await referal.setMWallet(conf.mWallet)
 
   await usersTarifsStore.appendOwner(referal.address)
@@ -66,6 +69,9 @@ module.exports = async function (deployer) {
   const keys = tarifsConf.matrix.map(x => key(x[0], x[1]))
   const percs = tarifsConf.matrix.map(x => x[2])
   await referal.setInviteMatrix(keys, percs)
+
+  const rankMatrix = await RankMatrix.at(await referal.rankMatrix())
+  await rankMatrix.setMatrix(allRanks.map(x => x.key), allRanks.map(x => x.value))
 
   // console.log('erc20.address', erc20Address)
   console.log('referal.address', referal.address)

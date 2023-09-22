@@ -10,9 +10,10 @@ struct UserStructRec {
 
 contract UsersTreeStore is MultyOwner {
     mapping(address => UserStructRec) public users;
+    mapping(address => bool) public blockedUsers;
 
     address[] public registeredUsers;
-    
+   
     function registeredUsersCount() public view returns (uint256) {
         return registeredUsers.length;
     }
@@ -23,6 +24,10 @@ contract UsersTreeStore is MultyOwner {
 
     function getUserInfo(address _acc) public view returns (UserStructRec memory) {
         return users[_acc];
+    }
+
+    function adminSetUserBlocked(address _acc, bool _blocked) public onlyOwner{
+        blockedUsers[_acc] = _blocked;
     }
 
     function getMentor(address _acc) public view returns (address) {

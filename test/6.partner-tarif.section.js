@@ -1,7 +1,7 @@
 const { TarifData } = require("../utils/tarif");
 const { buyTarif, makeBalancer } = require("./utils-finance");
 const { init, mustFail, span49h, span31d, } = require("./utils-system");
-const { partnerTarifs, userHasPTarif, maxClientTarif } = require("./utils-tarifs");
+const { partnerTarifs, userHasPTarif, maxClientTarif, getUsage } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Can buy any partner tarif (at start)", async function () {
@@ -37,10 +37,10 @@ module.exports = () => {
     })
 
     it("Can buy same OR better tarif after fill and 48h", async function () {
-        const { uAcc, usersTarifsStore, usersFinance } = await init();
+        const { uAcc, usersTree, usersTarifsStore, usersFinance, referal } = await init();
 
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.adminSetFilled(uAcc);        
         await mustFail(buyTarif(partnerTarifs[0], uAcc))
         
         await span49h();

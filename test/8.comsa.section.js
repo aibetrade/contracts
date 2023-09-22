@@ -38,8 +38,9 @@ module.exports = () => {
             await bal.append()
             {
                 const diff = bal.diff()
+
                 assert.equal(diff.company, partnerTarifs[0].price * 0.3)
-                assert.equal(diff.quart, partnerTarifs[0].price * 0.05)
+                assert.equal(diff.quartc, partnerTarifs[0].price * 0.05)
                 assert.equal(diff.magic, partnerTarifs[0].price * 0.65)
             }
             assert.equal(await usersFinance.comsaExists(uAcc), true)
@@ -58,7 +59,7 @@ module.exports = () => {
         {
             const diff = bal.diff()
             assert.equal(diff.company, partnerTarifs[0].price * 0.3)
-            assert.equal(diff.quart, partnerTarifs[0].price * 0.05)
+            assert.equal(diff.quartc, partnerTarifs[0].price * 0.05)
             assert.equal(diff.magic, partnerTarifs[0].price * 0.65)
         }
         assert.equal(await usersFinance.comsaExists(uAcc), true)
@@ -68,7 +69,7 @@ module.exports = () => {
         {
             const diff = bal.diff()
             assert.equal(diff.company, partnerTarifs[0].price * 0.3 + clientTarifs[0].price * 0.3)
-            assert.equal(diff.quart, partnerTarifs[0].price * 0.05 + clientTarifs[0].price * 0.05)
+            assert.equal(diff.quartc, partnerTarifs[0].price * 0.05 + clientTarifs[0].price * 0.05)
             assert.equal(diff.magic, partnerTarifs[0].price * 0.65 + clientTarifs[0].price * 0.65)
         }
         assert.equal(await usersFinance.comsaExists(uAcc), false)
@@ -104,7 +105,7 @@ module.exports = () => {
         {
             const diff = bal.diff()
             assert.equal(diff.company, partnerTarifs[0].price * 0.3)
-            assert.equal(diff.quart, partnerTarifs[0].price * 0.05)
+            assert.equal(diff.quartc, partnerTarifs[0].price * 0.05)
             assert.equal(diff.magic, partnerTarifs[0].price * 0.65)
         }
         assert.equal(await usersFinance.comsaExists(uAcc), false)
