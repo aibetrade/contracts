@@ -1,9 +1,13 @@
 const { TarifData } = require("../utils/tarif");
-const { clientTarifs } = require("./utils-conf");
+const { clientTarifs, partnerTarifs } = require("./utils-conf");
 const { init } = require("./utils-system")
 
 function maxClientTarif() {
     return clientTarifs[clientTarifs.length - 1];
+}
+
+function maxParentTarif() {
+    return partnerTarifs[partnerTarifs.length - 1];
 }
 
 async function setCTarifs(tarifs, from) {
@@ -68,6 +72,8 @@ async function getRollback(acc) {
 
 module.exports = {
     maxClientTarif,
+    maxParentTarif,
+    
     setCTarifs,
     setPTarifs,
     setMatrix,

@@ -1,7 +1,7 @@
 const { partnerTarifs, clientTarifs } = require("./utils-conf");
 const { makeBalancer, buyTarif } = require("./utils-finance");
 const { init, span49h } = require("./utils-system");
-const { maxClientTarif } = require("./utils-tarifs");
+const { maxClientTarif, maxParentTarif } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Build net uAcc -> m1Acc -> m2Acc -> m3Acc -> m4Acc -> m5Acc", async function () {
@@ -62,16 +62,25 @@ module.exports = () => {
     })
 
     it("Set all pTarif 3", async function () {
-        const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTree, usersTarifsStore } = await init();
+        const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTarifsStore } = await init();
 
-        await usersTarifsStore.adminSetPTarif(m1Acc, partnerTarifs[3].pack(), 1)
-        await usersTarifsStore.adminSetPTarif(m2Acc, partnerTarifs[3].pack(), 1)
-        await usersTarifsStore.adminSetPTarif(m3Acc, partnerTarifs[3].pack(), 1)
-        await usersTarifsStore.adminSetPTarif(m4Acc, partnerTarifs[3].pack(), 1)
-        await usersTarifsStore.adminSetPTarif(m5Acc, partnerTarifs[3].pack(), 1)
+        await usersTarifsStore.adminSetCTarif(m1Acc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetCTarif(m2Acc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetCTarif(m3Acc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetCTarif(m4Acc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetCTarif(m5Acc, maxClientTarif().pack())
 
-        const bal = await makeBalancer()
-        // console.log(bal.records[0].ext2)
+        await usersTarifsStore.adminSetPTarif(m1Acc, maxParentTarif().pack(), 1)
+        await usersTarifsStore.adminSetPTarif(m2Acc, maxParentTarif().pack(), 1)
+        await usersTarifsStore.adminSetPTarif(m3Acc, maxParentTarif().pack(), 1)
+        await usersTarifsStore.adminSetPTarif(m4Acc, maxParentTarif().pack(), 1)
+        await usersTarifsStore.adminSetPTarif(m5Acc, maxParentTarif().pack(), 1)
+
+        await usersTarifsStore.adminSetRank(m1Acc, 3)
+        await usersTarifsStore.adminSetRank(m2Acc, 3)
+        await usersTarifsStore.adminSetRank(m3Acc, 3)
+        await usersTarifsStore.adminSetRank(m4Acc, 3)
+        await usersTarifsStore.adminSetRank(m5Acc, 3)
     })
 
     it("uAcc buy c tarif step 2", async function () {
@@ -88,4 +97,31 @@ module.exports = () => {
 
         console.log('diff2', bal.diff().ext2)
     })
+
+    it("uAcc buy pTarif and processComsa", async function () {
+        const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, referal, usersFinance, usersTree, usersTarifsStore } = await init();
+
+        await span49h();
+
+        assert.equal(await usersFinance.comsaExists(uAcc), false)
+        assert.equal(await referal.canTakeComsa(uAcc), false)
+
+        const bal = await makeBalancer()
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetRegistered(uAcc)
+        await usersTarifsStore.adminSetFilled(uAcc)
+
+        await buyTarif(maxParentTarif(), uAcc)
+        
+
+        await span49h();
+
+        assert.equal(await usersFinance.comsaExists(uAcc), true)
+        assert.equal(await referal.canTakeComsa(uAcc), true)
+        await referal.takeComsa(uAcc)
+
+        await bal.append()
+
+        console.log('diff after', bal.diff().ext2)
+    })    
 }

@@ -152,21 +152,25 @@ contract Referal is MultyOwner {
     }
 
     function partnerScheme(address _client, address mentor, uint32 curPriceCent) internal returns(uint32){
-        uint8 ni = rankMatrix.maxLevel();
+        uint8 maxLevel = rankMatrix.maxLevel();
 
         uint32 basePriceCent = curPriceCent;
+        uint8 level = 1;
 
-        for (uint8 i = 0; i < ni; i++){
-            if (mentor == address(1) || mentor == address(0) || basePriceCent == 0){
+        while (true){
+            if (mentor == address(0) || mentor == address(1) || basePriceCent == 0 || level > maxLevel){
                 break;
             }
 
-            uint8 mentorRank = usersTarifsStore.ranks(mentor);
-            uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, i + 1));
+            if (usersTarifsStore.isPartnerActive(mentor)){
+                uint8 mentorRank = usersTarifsStore.ranks(mentor);
+                uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, level));
 
-            uint32 lvCent = basePriceCent * perc / 100;
-            usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
-            curPriceCent -= lvCent;
+                uint32 lvCent = basePriceCent * perc / 100;
+                usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
+                curPriceCent -= lvCent;
+            }
+
             mentor = usersTree.getMentor(mentor);
         }       
 
