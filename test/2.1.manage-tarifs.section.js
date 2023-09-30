@@ -1,7 +1,8 @@
 const { TarifData } = require("../utils/tarif");
+const { clientTarifs, partnerTarifs, inviteBonusHash } = require("./utils-conf");
 // const { inviteBonusHash } = require("./tarifs-data");
 const { init, mustFail } = require("./utils-system");
-const { setCTarifs, setPTarifs, clientTarifs, partnerTarifs, setMatrix, inviteBonusHash } = require("./utils-tarifs");
+const { setCTarifs, setPTarifs, setMatrix } = require("./utils-tarifs");
 
 module.exports = () => {
     it("All accounts have access to contract", async function () {

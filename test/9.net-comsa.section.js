@@ -1,6 +1,7 @@
+const { partnerTarifs, clientTarifs } = require("./utils-conf");
 const { makeBalancer, buyTarif } = require("./utils-finance");
 const { init, span49h } = require("./utils-system");
-const { partnerTarifs, maxClientTarif, clientTarifs, getUsage } = require("./utils-tarifs");
+const { maxClientTarif } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Build net uAcc -> m1Acc -> m2Acc -> m3Acc -> m4Acc -> m5Acc", async function () {

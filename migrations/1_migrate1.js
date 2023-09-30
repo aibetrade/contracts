@@ -1,3 +1,5 @@
+process.env.TZ = 'Europe/London';
+
 var Referal = artifacts.require("Referal");
 var ERC20Token = artifacts.require("ERC20Token");
 var TarifDataLib = artifacts.require("TarifDataLib");
@@ -8,12 +10,20 @@ const TarifsStoreBase = artifacts.require("TarifsStoreBase");
 const RankMatrix = artifacts.require("RankMatrix");
 
 const { writeFileSync } = require('fs');
-const conf = require('./conf.json');
-const tarifsConf = require('./tarifs.json');
+const tarifsConf = require('./conf/tarifs.json');
 const { TarifData } = require('../utils/tarif');
-const { allRanks } = require('../test/utils-tarifs');
+const { allRanks } = require('../test/utils-conf');
+// const { allRanks } = require('../test/utils-tarifs');
 
-module.exports = async function (deployer) {
+
+module.exports = async function (deployer, network, accounts) {
+  network = network || ''
+
+  console.log('Deploy in network: ', network)
+
+  const conf = network ? require(`./conf/${network.toLowerCase()}.conf.json`) : require(`./conf/conf.json`);
+  console.log('With params: ', conf)
+
   // return
   let erc20Address = conf.erc20
   if (!erc20Address) {
@@ -42,7 +52,8 @@ module.exports = async function (deployer) {
   await usersFinance.appendOwner(usersTarifsStore.address)
 
   await deployer.link(TarifDataLib, Referal);
-  await deployer.deploy(Referal, UsersTarifsStore.address, usersTreeStore.address);
+  // await deployer.deploy(Referal, usersTarifsStore.address, usersTreeStore.address);
+  await deployer.deploy(Referal);
 
   const referal = await Referal.deployed();
   await referal.setRegisterPrice(conf.registerPrice)
@@ -51,6 +62,9 @@ module.exports = async function (deployer) {
   await referal.setQCWallet(conf.qcWallet)
   await referal.setQPWallet(conf.qpWallet)
   await referal.setMWallet(conf.mWallet)
+
+  await referal.setUsersTarifsStore(usersTarifsStore.address);
+  await referal.setUsersTreeStore(usersTreeStore.address);
 
   await usersTarifsStore.appendOwner(referal.address)
   await usersFinance.appendOwner(referal.address)
@@ -70,11 +84,31 @@ module.exports = async function (deployer) {
   const percs = tarifsConf.matrix.map(x => x[2])
   await referal.setInviteMatrix(keys, percs)
 
-  const rankMatrix = await RankMatrix.at(await referal.rankMatrix())
+  await deployer.deploy(RankMatrix);
+  const rankMatrix = await RankMatrix.deployed();
   await rankMatrix.setMatrix(allRanks.map(x => x.key), allRanks.map(x => x.value))
+  await referal.setRankMatrix(rankMatrix.address);
+  await rankMatrix.appendOwner(referal.address)
 
   // console.log('erc20.address', erc20Address)
   console.log('referal.address', referal.address)
 
-  writeFileSync(__dirname + '/deploy.json', JSON.stringify({ ...conf, erc20: erc20Address, referal: referal.address }, null, 2))
+  const filename = __dirname + `/history/${network}.${new Date().toJSON().substring(0, 16).replace(':', '-')}.deploy.json`
+  const data = {
+    ...conf,
+    accounts,
+    erc20: erc20Address,
+    referal: referal.address,
+    usersTarifsStore: usersTarifsStore.address,
+    usersTreeStore: usersTreeStore.address,
+    usersFinance: usersFinance.address,
+    tarifDataLib: TarifDataLib.address,
+    rankMatrix: rankMatrix.address    
+  }
+
+  if (network == 'test') return;
+  
+  writeFileSync(filename, JSON.stringify(data, null, 2))
+  writeFileSync( __dirname + `/history/deploy.json`, JSON.stringify(data, null, 2))
+  writeFileSync( __dirname + `/history/conf.json`, JSON.stringify(conf, null, 2))
 };

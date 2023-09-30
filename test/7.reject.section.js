@@ -1,7 +1,8 @@
 const { TarifData } = require("../utils/tarif");
+const { partnerTarifs } = require("./utils-conf");
 const { buyTarif, getNextBuyInfo, makeBalancer, register } = require("./utils-finance");
 const { init, span49h, oneAddress } = require("./utils-system");
-const { userHasPTarif, userHasCTarif, partnerTarifs, maxClientTarif, getUsage } = require("./utils-tarifs");
+const { userHasPTarif, userHasCTarif, maxClientTarif, getUsage } = require("./utils-tarifs");
 
 
 module.exports = () => {

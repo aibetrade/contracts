@@ -1,7 +1,8 @@
 const { TarifData } = require("../utils/tarif");
+const { partnerTarifs } = require("./utils-conf");
 const { buyTarif, makeBalancer } = require("./utils-finance");
 const { init, mustFail, span49h, span31d, } = require("./utils-system");
-const { partnerTarifs, userHasPTarif, maxClientTarif, getUsage } = require("./utils-tarifs");
+const { userHasPTarif, maxClientTarif } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Can buy any partner tarif (at start)", async function () {

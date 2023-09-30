@@ -1,7 +1,8 @@
 const { TarifData } = require("../utils/tarif");
+const { partnerTarifs, clientTarifs } = require("./utils-conf");
 const { buyTarif, makeBalancer } = require("./utils-finance");
 const { init, span49h } = require("./utils-system");
-const { userHasPTarif, partnerTarifs, maxClientTarif, clientTarifs } = require("./utils-tarifs");
+const { userHasPTarif, maxClientTarif } = require("./utils-tarifs");
 
 
 module.exports = () => {
@@ -91,7 +92,7 @@ module.exports = () => {
     })
 
     it("Manual take comsa is ok", async function () {
-        const { uAcc, referal, usersFinance, usersTarifsStore } = await init();
+        const { uAcc, referal, usersFinance } = await init();
 
         await buyTarif(partnerTarifs[0], uAcc)
         span49h()

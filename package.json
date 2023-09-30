@@ -10,15 +10,19 @@
     "test": "truffle test",
     "test:watch": "nodemon --ext js,sol --exec truffle test",
     "size": "truffle run contract-size",
-    "test:aibe": "truffle test --network aibe"
+    "test:aibe": "truffle test --network aibe",
+    "flat": "npx truffle-flattener ./contracts-src/Referal.sol > ./contracts/plain.sol"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@openzeppelin/test-helpers": "^0.5.16",
     "@truffle/hdwallet-provider": "^2.1.14",
     "dotenv": "^16.3.1",
-    "truffle-privatekey-provider": "^1.5.0",
-    "@openzeppelin/test-helpers": "^0.5.16"
+    "truffle-privatekey-provider": "^1.5.0"
+  },
+  "devDependencies": {
+    "truffle-plugin-verify": "^0.6.5"
   }
 }

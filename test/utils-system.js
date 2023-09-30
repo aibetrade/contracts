@@ -6,10 +6,8 @@ var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
 const RankMatrix = artifacts.require("RankMatrix");
 
-const { time } = require('@openzeppelin/test-helpers');
-
-const conf = require("../migrations/conf.json")
-const deploy = require("../migrations/deploy.json")
+const conf = require("../migrations/history/conf.json")
+const deploy = require("../migrations/history/deploy.json")
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 const oneAddress = '0x0000000000000000000000000000000000000001';

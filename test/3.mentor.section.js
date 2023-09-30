@@ -1,6 +1,6 @@
+const { clientTarifs } = require("./utils-conf");
 const { buyTarif } = require("./utils-finance");
 const { init, oneAddress, zeroAddress, mustFail } = require("./utils-system");
-const { clientTarifs } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Can not buy tarif without mentor", async function () {

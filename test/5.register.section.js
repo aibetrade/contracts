@@ -1,6 +1,6 @@
+const { partnerTarifs, clientTarifs } = require("./utils-conf");
 const { buyTarif, toErc20, register } = require("./utils-finance");
 const { init, mustFail } = require("./utils-system");
-const { partnerTarifs, clientTarifs } = require("./utils-tarifs");
 
 module.exports = () => {
     // Check can buy partner tarif

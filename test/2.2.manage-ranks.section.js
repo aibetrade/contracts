@@ -1,11 +1,9 @@
-const { TarifData } = require("../utils/tarif");
-// const { inviteBonusHash } = require("./tarifs-data");
+const { allRanks } = require("./utils-conf");
 const { init, mustFail } = require("./utils-system");
-const { setCTarifs, setPTarifs, clientTarifs, partnerTarifs, setMatrix, inviteBonusHash, allRanks } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Tokey/fromKey is ok", async function () {
-        const { accounts, rankMatrix } = await init();
+        const { rankMatrix } = await init();
 
         for(let rr of allRanks){
             const fk = await rankMatrix.fromKey(rr.key)

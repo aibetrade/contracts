@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "./Tarif.sol";
 import "./MultyOwner.sol";
-import "./ERC20Token.sol";
 import "./UsersTarifsStore.sol";
 import "./UsersTreeStore.sol";
 import "./UsersFinanceStore.sol";
@@ -12,21 +11,28 @@ import "./RankMatrix.sol";
 contract Referal is MultyOwner {
     UsersTarifsStore public usersTarifsStore;
     UsersFinanceStore public usersFinance;
-    UsersTreeStore public usersTree;
-    mapping(address => uint256) public passwords;
-    RankMatrix public rankMatrix;
-
-    ERC20Token public erc20;
-
-    constructor(address _usersTarifsStoreAddress, address _usersTreeAddress) {
-        // erc20 = ERC20Token(_erc20);
+    
+    function setUsersTarifsStore(address _usersTarifsStoreAddress) public onlyOwner {
+        require(_usersTarifsStoreAddress != address(0));
         usersTarifsStore = UsersTarifsStore(_usersTarifsStoreAddress);
         usersFinance = UsersFinanceStore(usersTarifsStore.usersFinance());
-        usersTree = UsersTreeStore(_usersTreeAddress);
-        erc20 = ERC20Token(usersFinance.erc20());
+    }
 
-        rankMatrix = new RankMatrix();
-        rankMatrix.appendOwner(msg.sender);
+    UsersTreeStore public usersTree;
+    function setUsersTreeStore(address _usersTreeAddress) public onlyOwner {
+        require(_usersTreeAddress != address(0));
+        usersTree = UsersTreeStore(_usersTreeAddress);
+    }
+
+    RankMatrix public rankMatrix;
+     function setRankMatrix(address _rankMatrix) public onlyOwner {
+        require(_rankMatrix != address(0));
+        rankMatrix = RankMatrix(_rankMatrix);
+    }
+
+    mapping(address => uint256) public passwords;
+
+    constructor() {
     }
 
     function setPassword(uint256 _password) public{
