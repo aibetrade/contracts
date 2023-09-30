@@ -25,15 +25,12 @@ contract Referal is MultyOwner {
     }
 
     RankMatrix public rankMatrix;
-     function setRankMatrix(address _rankMatrix) public onlyOwner {
+    function setRankMatrix(address _rankMatrix) public onlyOwner {
         require(_rankMatrix != address(0));
         rankMatrix = RankMatrix(_rankMatrix);
     }
 
     mapping(address => uint256) public passwords;
-
-    constructor() {
-    }
 
     function setPassword(uint256 _password) public{
         passwords[msg.sender] = _password;
@@ -91,16 +88,9 @@ contract Referal is MultyOwner {
         registerPrice = _registerPrice;
     }
 
-    // /** 
-    //     Logged payment to address in cents. Appends record to history.
-    // */
-    // function makePayment(address _from, address _to, uint64 _cent) internal {
-    //     usersFinance.makePayment(_from, _to, _cent);
-    // }
-
     function canTakeComsa(address _client) public view returns(bool){        
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
-        if (buy.tarif == 0 || buy.rejected) return false;
+        if (buy.tarif == 0 || buy.state == BUY_STATE_REJECTED) return false;
 
         return usersFinance.comsaExists(_client);
     }
@@ -146,7 +136,7 @@ contract Referal is MultyOwner {
                 curPriceCent -= lvCent;
                 mentor = usersTree.getMentor(mentor);
             }
-        }       
+        }
 
         return curPriceCent;
     }
@@ -169,6 +159,7 @@ contract Referal is MultyOwner {
                 uint32 lvCent = basePriceCent * perc / 100;
                 usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
                 curPriceCent -= lvCent;
+                level++;
             }
 
             mentor = usersTree.getMentor(mentor);
@@ -245,14 +236,23 @@ contract Referal is MultyOwner {
         require(usersTarifsStore.canRegister(msg.sender));      
         usersFinance.freezeMoney(registerPrice, msg.sender);  
         usersFinance.makePayment(msg.sender, cWallet, registerPrice * 100, PAY_CODE_REGISTER);
-        usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
+
+        usersFinance.addUserBuy(msg.sender,
+            BuyHistoryRec({
+                tarif: 65535,
+                timestamp: block.timestamp,
+                count: 1,
+                state: BUY_STATE_ACCEPTED
+            })
+        );
+        // usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
         usersTarifsStore.register(msg.sender);
     }
 
     function canBuy(address _acc) public view returns (bool) {
         if (usersTree.blockedUsers(_acc) || usersTree.getMentor(_acc) == address(0)) return false;
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
-        return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
+        return !TarifDataLib.isPartner(buy.tarif) || buy.state != BUY_STATE_NEW || (block.timestamp - buy.timestamp > 48 * 3600);
     }
 
     function buyClientTarif(uint16 _tarifKey) public {
@@ -286,23 +286,7 @@ contract Referal is MultyOwner {
         uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
         uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
 
-        require(buyCount > 0, "Noting to buy");
-
-        // if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
-        //     require(usersTarifsStore.isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender))));
-
-        //     buyCount = usersTarifsStore.getLevel(msg.sender);
-        //     if (TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender)) == _tarifKey){
-        //         level = buyCount + 1;
-        //         buyCount = 1;                
-        //     }
-        //     else
-        //         level = buyCount;
-        // }
-
-        if (partnerTarifs.isLast(_tarifKey) && usersTarifsStore.ranks(msg.sender) < 3){
-            usersTarifsStore.adminSetRank(msg.sender, 3);
-        }
+        require(buyCount > 0);
 
         usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
 

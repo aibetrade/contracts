@@ -28,14 +28,14 @@ module.exports = () => {
 
         await buyTarif(partnerTarifs[0], uAcc)
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
         await bal.append()
         assert.equal(bal.diff().company, 0)
 
         for (let i = 0; i < 3; i++) {
             await buyTarif(partnerTarifs[0], uAcc)
             await span49h();
-            await usersTarifsStore.adminSetFilled(uAcc);
+            await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
             await bal.append()
             {
                 const diff = bal.diff()
@@ -55,7 +55,7 @@ module.exports = () => {
 
         await buyTarif(partnerTarifs[0], uAcc)
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
         await bal.append()
         {
             const diff = bal.diff()

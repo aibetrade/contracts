@@ -109,19 +109,26 @@ module.exports = () => {
         const bal = await makeBalancer()
         await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
         await usersTarifsStore.adminSetRegistered(uAcc)
-        await usersTarifsStore.adminSetFilled(uAcc)
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100)
 
         await buyTarif(maxParentTarif(), uAcc)
-        
+        // await buyTarif(maxClientTarif(), uAcc)
 
         await span49h();
 
         assert.equal(await usersFinance.comsaExists(uAcc), true)
         assert.equal(await referal.canTakeComsa(uAcc), true)
+
+        await bal.append()
+        console.log(bal)
+
+        const buy = await usersFinance.getLastBuy(uAcc)
+        console.log(buy)
+
         await referal.takeComsa(uAcc)
 
         await bal.append()
 
         console.log('diff after', bal.diff().ext2)
-    })    
+    })
 }

@@ -45,9 +45,7 @@ module.exports = () => {
         const usageBeforeBuy = await getUsage(m1Acc)
 
         await buyTarif(partnerTarifs[0], m1Acc)
-        await usersTarifsStore.adminSetFilled(m1Acc)
-        await usersTarifsStore.adminFillSlots(m1Acc)
-        await usersTarifsStore.adminFillLVSlots(m1Acc)
+        await usersTarifsStore.setUsage(m1Acc, 0, 0, 100)
 
         assert.equal(await usersTarifsStore.canReject(m1Acc), true)
         const bal = await makeBalancer()
@@ -61,7 +59,7 @@ module.exports = () => {
         // Check tarif rollback is ok
         assert.equal(pTarifBeforeBuy.tarif.toString(), pTarifAfterReject.tarif.toString())
         // Last buy rejected        
-        assert.equal(buy.rejected, true)
+        assert.equal(buy.state, 1)
         // Usage rejected ok
         assert.deepEqual(usageBeforeBuy, usageAfterReject)
 
@@ -83,7 +81,7 @@ module.exports = () => {
 
         await buyTarif(partnerTarifs[0], m1Acc)
         await span49h();
-        await usersTarifsStore.adminSetFilled(m1Acc);
+        await usersTarifsStore.setUsage(m1Acc, 0, 0, 100);
 
         const nextBuy = await getNextBuyInfo(partnerTarifs[0], m1Acc)
         const pTarifBeforeBuy = await usersTarifsStore.pTarifs(m1Acc)
@@ -114,11 +112,11 @@ module.exports = () => {
 
         await buyTarif(partnerTarifs[0], m1Acc)
         await span49h();
-        await usersTarifsStore.adminSetFilled(m1Acc);
+        await usersTarifsStore.setUsage(m1Acc, 0, 0, 100);
 
         await buyTarif(partnerTarifs[0], m1Acc)
         await span49h();
-        await usersTarifsStore.adminSetFilled(m1Acc);
+        await usersTarifsStore.setUsage(m1Acc, 0, 0, 100);
 
         const nextBuy = await getNextBuyInfo(partnerTarifs[2], m1Acc)
         const pTarifBeforeBuy = await usersTarifsStore.pTarifs(m1Acc)

@@ -1,6 +1,8 @@
-// File: contracts-src\MultyOwner.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+// File: contracts-src\MultyOwner.sol
+
+
 
 
 contract MultyOwner {
@@ -31,6 +33,8 @@ contract MultyOwner {
 }
 
 // File: contracts-src\TarifDataLib.sol
+
+
 
 
 uint16 constant REGISTRATION_KEY = 65535;
@@ -80,6 +84,8 @@ library TarifDataLib {
 }
 
 // File: contracts-src\Tarif.sol
+
+
 
 
 
@@ -160,6 +166,8 @@ contract TarifsStore {
 // File: contracts-src\ERC20Token.sol
 
 
+
+
 contract ERC20Token {
     string public name;
     string public symbol;
@@ -225,6 +233,8 @@ contract ERC20Token {
 
 // File: contracts-src\UsersFinanceStore.sol
 
+
+
 uint8 constant PAY_CODE_INVITE_CLI = 1;
 uint8 constant PAY_CODE_INVITE_PAR = 2;
 uint8 constant PAY_CODE_COMPANY = 3;
@@ -240,6 +250,9 @@ uint8 constant PAY_CODE_PAR_RANK = 10;
 // uint8 constant PAY_CODE_LV = 4;
 // uint8 constant PAY_CODE_TEAM = 5;
 
+uint8 constant BUY_STATE_NEW = 0;
+uint8 constant BUY_STATE_REJECTED = 1;
+uint8 constant BUY_STATE_ACCEPTED = 2;
 
 struct PayHistoryRec {
     address from;
@@ -249,11 +262,10 @@ struct PayHistoryRec {
 }
 
 struct BuyHistoryRec {
-    address from; // Needs for rollbacgetk
     uint256 timestamp;
     uint256 tarif;
     uint16 count; // How many tarifs was bought
-    bool rejected;
+    uint8 state;
 }
 
 struct UserFinanceRec {
@@ -281,7 +293,7 @@ contract UsersFinanceStore is MultyOwner {
     }
 
     function getLastBuy(address _acc) public view returns (BuyHistoryRec memory) {
-        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(address(0), 0, 0, 0, false);
+        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(0, 0, 0, 0);
         return users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
     }
 
@@ -315,7 +327,7 @@ contract UsersFinanceStore is MultyOwner {
 
     function rejectBuy(address _acc) public onlyOwner {        
         BuyHistoryRec storage buy = users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
-        buy.rejected = true;
+        buy.state = BUY_STATE_REJECTED;
         
         uint32 price = TarifDataLib.getPrice(buy.tarif);
         uint32 count = buy.count;
@@ -334,24 +346,32 @@ contract UsersFinanceStore is MultyOwner {
     function makePayment(address _from, address _to, uint64 _cent, uint8 _payCode) public onlyOwner {
         erc20.transfer(_to, centToErc20(_cent));
         addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from, payCode: _payCode}));
+
+        if (users[_to].buyHistory.length == 0) return;
+        BuyHistoryRec storage buy = users[_to].buyHistory[users[_to].buyHistory.length - 1];
+        if (buy.state == 0)
+        buy.state = BUY_STATE_ACCEPTED;
     }
 }
 
 // File: contracts-src\UsersTarifsStore.sol
 
-uint256 constant MONTH = 30 * 86400;
+
+
 uint256 constant YEAR = 360 * 86400;
 
 // If reject rollback to this
 struct RollbackStruct {
     uint256 tarif; 
     uint256 date;
+    uint256 endsAt;
     UsageRec usage;
 }
 
 struct UserTarifStruct {
     uint256 tarif;
     uint256 boughtAt;
+    uint256 endsAt;
     bool gotInviteBonus;
 }
 
@@ -372,19 +392,31 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     mapping(address => UsageRec) public usage;
     mapping(address => uint8) public ranks;
 
+    bool public actionEnabled;
+    function setActionEnabled(bool _actionEnabled) public onlyOwner {
+        actionEnabled = _actionEnabled;
+    }
+
+    uint256 public clientTarifLength;
+    function setClientTarifLength(uint256 _clientTarifLength) public onlyOwner {
+        clientTarifLength = _clientTarifLength;
+    }    
+
     UsersFinanceStore public usersFinance;
 
     constructor(address _usersFinanceAddress) {
         usersFinance = UsersFinanceStore(_usersFinanceAddress);
+        setClientTarifLength(30 * 86400);
     }    
 
     // --- Admin section ---
     function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
-        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, true);
+        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, block.timestamp + clientTarifLength, true);
     }
 
     function adminSetPTarif(address _acc, uint256 _pTarif, uint8 level) public onlyOwner {
-        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, true);
+        registered[_acc] = true;
+        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, block.timestamp + YEAR, true);
         usage[_acc] = UsageRec(
             level * TarifDataLib.getNumSlots(_pTarif),
             level * TarifDataLib.getNumLVSlots(_pTarif),
@@ -395,16 +427,10 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         registered[_acc] = true;
     }
 
-    function adminFillSlots(address _acc) public onlyOwner {
-        usage[_acc].freeSlots = 0;
-    }
-
-    function adminFillLVSlots(address _acc) public onlyOwner {
-        usage[_acc].freeLVSlots = 0;
-    }
-
-    function adminSetFilled(address _acc) public onlyOwner {        
-        usage[_acc].filled = TarifDataLib.getFullNum(pTarifs[_acc].tarif);
+    function setUsage(address _acc, uint16 _freeSlots, uint16 _freeLVSlots, uint16 _filled) public onlyOwner {
+        usage[_acc].freeSlots = _freeSlots;
+        usage[_acc].freeLVSlots = _freeLVSlots;
+        usage[_acc].filled = _filled;
     }
 
     function adminSetRank(address _acc, uint8 _rank) public onlyOwner {        
@@ -431,20 +457,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
     // --- User space
 
-    // function getBuyHistory(
-    //     address user
-    // ) public view returns (BuyHistoryRec[] memory) {
-    //     return users[user].buyHistory;
-    // }
-
-    // function getPayHistory(
-    //     address user
-    // ) public view returns (PayHistoryRec[] memory) {
-    //     return users[user].payHistory;
-    // }
-
     function isClientTarifActive(address _client) public view returns (bool) {
-        return block.timestamp - cTarifs[_client].boughtAt <= MONTH;
+        return block.timestamp < cTarifs[_client].endsAt;
     }
 
     function isPartnerTarifActive(address _partner) public view returns (bool) {
@@ -454,13 +468,13 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     function newClientTarif(address _acc, uint256 _tarif) public onlyOwner {
         cTarifs[_acc].tarif = _tarif;
         cTarifs[_acc].boughtAt = block.timestamp;
+        cTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
 
         usersFinance.addUserBuy(_acc, BuyHistoryRec({
-            from: _acc,
             tarif: _tarif,
             timestamp: block.timestamp,
             count: 1,
-            rejected: false
+            state: 0
         }));
     }
 
@@ -488,39 +502,41 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         return 1;
     }
 
-
     function newPartnerTarif(address _acc, uint256 _tarif, uint16 _count, uint16 _level) public onlyOwner {
         rollbacks[_acc].tarif = pTarifs[_acc].tarif;
         rollbacks[_acc].date = pTarifs[_acc].boughtAt;
+        rollbacks[_acc].endsAt = pTarifs[_acc].endsAt;
         rollbacks[_acc].usage = usage[_acc];
-        // rollbacks[_acc].usage = UsageRec(usage[_acc].freeSlots, usage[_acc].freeLVSlots, usage[_acc].level, usage[_acc].filled);
 
-        if (_tarif != REGISTRATION_KEY){
-            pTarifs[_acc].tarif = _tarif;
-            pTarifs[_acc].boughtAt = block.timestamp;
-            if (isPartnerTarifActive(_acc)){
-                usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
-                usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
-            }
-            else{
-                usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
-                usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
-            }
+        pTarifs[_acc].tarif = _tarif;
+        pTarifs[_acc].boughtAt = block.timestamp;
+        pTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
+        if (isPartnerTarifActive(_acc)){
+            usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
+            usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
+        }
+        else{
+            usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
+            usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
         }
 
         usersFinance.addUserBuy(_acc,
             BuyHistoryRec({
-                from: _acc,
                 tarif: _tarif,
                 timestamp: block.timestamp,
                 count: _count,
-                rejected: false
+                state: 0
             })
         );
 
         usage[_acc].level = _level;
         usage[_acc].filled = 0;
         usersFinance.setComsaExists(_acc, true);
+
+        if (actionEnabled && partnerTarifs.isLast(TarifDataLib.tarifKey(_tarif))){
+            adminSetRank(_acc, 3);
+            cTarifs[_acc].endsAt += 60 * 86400;
+        }        
     }
 
     function canReject(address _acc) public view returns (bool) {
@@ -529,25 +545,26 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
 
         return TarifDataLib.isPartner(buy.tarif) 
-            && buy.rejected == false
+            && buy.state == 0
             && block.timestamp - buy.timestamp < 48 * 3600;
     }
 
     function reject() public {
         require(canReject(msg.sender));
 
+        if (actionEnabled && partnerTarifs.isLast(TarifDataLib.tarifKey(pTarifs[msg.sender].tarif))){
+            cTarifs[msg.sender].endsAt -= 60 * 86400;
+        }
+
         pTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
         pTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
+        pTarifs[msg.sender].endsAt = rollbacks[msg.sender].endsAt;
         usage[msg.sender] = rollbacks[msg.sender].usage;
 
         usersFinance.rejectBuy(msg.sender);
     }
 
-    function getUsage(address _acc) public view returns (UsageRec memory) {
-        return usage[_acc];
-    }
-
-    function useFill(address _acc) public {
+    function useFill(address _acc) public onlyOwner {
         usage[_acc].filled++;
     }
 
@@ -607,8 +624,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
     function register(address _acc) public onlyOwner {
         registered[_acc] = true;
-        usage[_acc].level = 1;
-        cTarifs[_acc].boughtAt = block.timestamp;
+        usage[_acc].level = 1;        
+        cTarifs[_acc].endsAt += 30 * 86400;
     }
 
     function cTarifExists(uint16 _tarifKey) public view returns (bool) {
@@ -628,6 +645,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 }
 
 // File: contracts-src\UsersTreeStore.sol
+
+
 
 struct UserStructRec {
     address mentor;
@@ -700,6 +719,8 @@ contract UsersTreeStore is MultyOwner {
 
 // File: contracts-src\RankMatrix.sol
 
+
+
 contract RankMatrix is MultyOwner {
     constructor() {}
 
@@ -739,6 +760,8 @@ contract RankMatrix is MultyOwner {
 
 
 
+
+
 contract Referal is MultyOwner {
     UsersTarifsStore public usersTarifsStore;
     UsersFinanceStore public usersFinance;
@@ -756,15 +779,12 @@ contract Referal is MultyOwner {
     }
 
     RankMatrix public rankMatrix;
-     function setRankMatrix(address _rankMatrix) public onlyOwner {
+    function setRankMatrix(address _rankMatrix) public onlyOwner {
         require(_rankMatrix != address(0));
         rankMatrix = RankMatrix(_rankMatrix);
     }
 
     mapping(address => uint256) public passwords;
-
-    constructor() {
-    }
 
     function setPassword(uint256 _password) public{
         passwords[msg.sender] = _password;
@@ -822,16 +842,9 @@ contract Referal is MultyOwner {
         registerPrice = _registerPrice;
     }
 
-    // /** 
-    //     Logged payment to address in cents. Appends record to history.
-    // */
-    // function makePayment(address _from, address _to, uint64 _cent) internal {
-    //     usersFinance.makePayment(_from, _to, _cent);
-    // }
-
     function canTakeComsa(address _client) public view returns(bool){        
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
-        if (buy.tarif == 0 || buy.rejected) return false;
+        if (buy.tarif == 0 || buy.state == BUY_STATE_REJECTED) return false;
 
         return usersFinance.comsaExists(_client);
     }
@@ -877,27 +890,32 @@ contract Referal is MultyOwner {
                 curPriceCent -= lvCent;
                 mentor = usersTree.getMentor(mentor);
             }
-        }       
+        }
 
         return curPriceCent;
     }
 
     function partnerScheme(address _client, address mentor, uint32 curPriceCent) internal returns(uint32){
-        uint8 ni = rankMatrix.maxLevel();
+        uint8 maxLevel = rankMatrix.maxLevel();
 
         uint32 basePriceCent = curPriceCent;
+        uint8 level = 1;
 
-        for (uint8 i = 0; i < ni; i++){
-            if (mentor == address(1) || mentor == address(0) || basePriceCent == 0){
+        while (true){
+            if (mentor == address(0) || mentor == address(1) || basePriceCent == 0 || level > maxLevel){
                 break;
             }
 
-            uint8 mentorRank = usersTarifsStore.ranks(mentor);
-            uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, i + 1));
+            if (usersTarifsStore.isPartnerActive(mentor)){
+                uint8 mentorRank = usersTarifsStore.ranks(mentor);
+                uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, level));
 
-            uint32 lvCent = basePriceCent * perc / 100;
-            usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
-            curPriceCent -= lvCent;
+                uint32 lvCent = basePriceCent * perc / 100;
+                usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
+                curPriceCent -= lvCent;
+                level++;
+            }
+
             mentor = usersTree.getMentor(mentor);
         }       
 
@@ -972,14 +990,23 @@ contract Referal is MultyOwner {
         require(usersTarifsStore.canRegister(msg.sender));      
         usersFinance.freezeMoney(registerPrice, msg.sender);  
         usersFinance.makePayment(msg.sender, cWallet, registerPrice * 100, PAY_CODE_REGISTER);
-        usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
+
+        usersFinance.addUserBuy(msg.sender,
+            BuyHistoryRec({
+                tarif: 65535,
+                timestamp: block.timestamp,
+                count: 1,
+                state: BUY_STATE_ACCEPTED
+            })
+        );
+        // usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
         usersTarifsStore.register(msg.sender);
     }
 
     function canBuy(address _acc) public view returns (bool) {
         if (usersTree.blockedUsers(_acc) || usersTree.getMentor(_acc) == address(0)) return false;
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
-        return !TarifDataLib.isPartner(buy.tarif) || buy.rejected || (block.timestamp - buy.timestamp > 48 * 3600);
+        return !TarifDataLib.isPartner(buy.tarif) || buy.state != BUY_STATE_NEW || (block.timestamp - buy.timestamp > 48 * 3600);
     }
 
     function buyClientTarif(uint16 _tarifKey) public {
@@ -1013,23 +1040,7 @@ contract Referal is MultyOwner {
         uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
         uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
 
-        require(buyCount > 0, "Noting to buy");
-
-        // if (usersTarifsStore.isPartnerTarifActive(msg.sender)){
-        //     require(usersTarifsStore.isT1BetterOrSameT2(_tarifKey, TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender))));
-
-        //     buyCount = usersTarifsStore.getLevel(msg.sender);
-        //     if (TarifDataLib.tarifKey(usersTarifsStore.pTarif(msg.sender)) == _tarifKey){
-        //         level = buyCount + 1;
-        //         buyCount = 1;                
-        //     }
-        //     else
-        //         level = buyCount;
-        // }
-
-        if (partnerTarifs.isLast(_tarifKey) && usersTarifsStore.ranks(msg.sender) < 3){
-            usersTarifsStore.adminSetRank(msg.sender, 3);
-        }
+        require(buyCount > 0);
 
         usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
 

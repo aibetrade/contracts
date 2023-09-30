@@ -5,19 +5,20 @@ import "./Tarif.sol";
 import "./MultyOwner.sol";
 import "./UsersFinanceStore.sol";
 
-uint256 constant MONTH = 30 * 86400;
 uint256 constant YEAR = 360 * 86400;
 
 // If reject rollback to this
 struct RollbackStruct {
     uint256 tarif; 
     uint256 date;
+    uint256 endsAt;
     UsageRec usage;
 }
 
 struct UserTarifStruct {
     uint256 tarif;
     uint256 boughtAt;
+    uint256 endsAt;
     bool gotInviteBonus;
 }
 
@@ -38,19 +39,31 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     mapping(address => UsageRec) public usage;
     mapping(address => uint8) public ranks;
 
+    bool public actionEnabled;
+    function setActionEnabled(bool _actionEnabled) public onlyOwner {
+        actionEnabled = _actionEnabled;
+    }
+
+    uint256 public clientTarifLength;
+    function setClientTarifLength(uint256 _clientTarifLength) public onlyOwner {
+        clientTarifLength = _clientTarifLength;
+    }    
+
     UsersFinanceStore public usersFinance;
 
     constructor(address _usersFinanceAddress) {
         usersFinance = UsersFinanceStore(_usersFinanceAddress);
+        setClientTarifLength(30 * 86400);
     }    
 
     // --- Admin section ---
     function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
-        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, true);
+        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, block.timestamp + clientTarifLength, true);
     }
 
     function adminSetPTarif(address _acc, uint256 _pTarif, uint8 level) public onlyOwner {
-        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, true);
+        registered[_acc] = true;
+        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, block.timestamp + YEAR, true);
         usage[_acc] = UsageRec(
             level * TarifDataLib.getNumSlots(_pTarif),
             level * TarifDataLib.getNumLVSlots(_pTarif),
@@ -61,16 +74,10 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         registered[_acc] = true;
     }
 
-    function adminFillSlots(address _acc) public onlyOwner {
-        usage[_acc].freeSlots = 0;
-    }
-
-    function adminFillLVSlots(address _acc) public onlyOwner {
-        usage[_acc].freeLVSlots = 0;
-    }
-
-    function adminSetFilled(address _acc) public onlyOwner {        
-        usage[_acc].filled = TarifDataLib.getFullNum(pTarifs[_acc].tarif);
+    function setUsage(address _acc, uint16 _freeSlots, uint16 _freeLVSlots, uint16 _filled) public onlyOwner {
+        usage[_acc].freeSlots = _freeSlots;
+        usage[_acc].freeLVSlots = _freeLVSlots;
+        usage[_acc].filled = _filled;
     }
 
     function adminSetRank(address _acc, uint8 _rank) public onlyOwner {        
@@ -97,20 +104,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
     // --- User space
 
-    // function getBuyHistory(
-    //     address user
-    // ) public view returns (BuyHistoryRec[] memory) {
-    //     return users[user].buyHistory;
-    // }
-
-    // function getPayHistory(
-    //     address user
-    // ) public view returns (PayHistoryRec[] memory) {
-    //     return users[user].payHistory;
-    // }
-
     function isClientTarifActive(address _client) public view returns (bool) {
-        return block.timestamp - cTarifs[_client].boughtAt <= MONTH;
+        return block.timestamp < cTarifs[_client].endsAt;
     }
 
     function isPartnerTarifActive(address _partner) public view returns (bool) {
@@ -120,13 +115,13 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     function newClientTarif(address _acc, uint256 _tarif) public onlyOwner {
         cTarifs[_acc].tarif = _tarif;
         cTarifs[_acc].boughtAt = block.timestamp;
+        cTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
 
         usersFinance.addUserBuy(_acc, BuyHistoryRec({
-            from: _acc,
             tarif: _tarif,
             timestamp: block.timestamp,
             count: 1,
-            rejected: false
+            state: 0
         }));
     }
 
@@ -154,39 +149,41 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         return 1;
     }
 
-
     function newPartnerTarif(address _acc, uint256 _tarif, uint16 _count, uint16 _level) public onlyOwner {
         rollbacks[_acc].tarif = pTarifs[_acc].tarif;
         rollbacks[_acc].date = pTarifs[_acc].boughtAt;
+        rollbacks[_acc].endsAt = pTarifs[_acc].endsAt;
         rollbacks[_acc].usage = usage[_acc];
-        // rollbacks[_acc].usage = UsageRec(usage[_acc].freeSlots, usage[_acc].freeLVSlots, usage[_acc].level, usage[_acc].filled);
 
-        if (_tarif != REGISTRATION_KEY){
-            pTarifs[_acc].tarif = _tarif;
-            pTarifs[_acc].boughtAt = block.timestamp;
-            if (isPartnerTarifActive(_acc)){
-                usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
-                usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
-            }
-            else{
-                usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
-                usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
-            }
+        pTarifs[_acc].tarif = _tarif;
+        pTarifs[_acc].boughtAt = block.timestamp;
+        pTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
+        if (isPartnerTarifActive(_acc)){
+            usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * _count;
+            usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * _count;
+        }
+        else{
+            usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
+            usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
         }
 
         usersFinance.addUserBuy(_acc,
             BuyHistoryRec({
-                from: _acc,
                 tarif: _tarif,
                 timestamp: block.timestamp,
                 count: _count,
-                rejected: false
+                state: 0
             })
         );
 
         usage[_acc].level = _level;
         usage[_acc].filled = 0;
         usersFinance.setComsaExists(_acc, true);
+
+        if (actionEnabled && partnerTarifs.isLast(TarifDataLib.tarifKey(_tarif))){
+            adminSetRank(_acc, 3);
+            cTarifs[_acc].endsAt += 60 * 86400;
+        }        
     }
 
     function canReject(address _acc) public view returns (bool) {
@@ -195,25 +192,26 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_acc);
 
         return TarifDataLib.isPartner(buy.tarif) 
-            && buy.rejected == false
+            && buy.state == 0
             && block.timestamp - buy.timestamp < 48 * 3600;
     }
 
     function reject() public {
         require(canReject(msg.sender));
 
+        if (actionEnabled && partnerTarifs.isLast(TarifDataLib.tarifKey(pTarifs[msg.sender].tarif))){
+            cTarifs[msg.sender].endsAt -= 60 * 86400;
+        }
+
         pTarifs[msg.sender].tarif = rollbacks[msg.sender].tarif;
         pTarifs[msg.sender].boughtAt = rollbacks[msg.sender].date;
+        pTarifs[msg.sender].endsAt = rollbacks[msg.sender].endsAt;
         usage[msg.sender] = rollbacks[msg.sender].usage;
 
         usersFinance.rejectBuy(msg.sender);
     }
 
-    function getUsage(address _acc) public view returns (UsageRec memory) {
-        return usage[_acc];
-    }
-
-    function useFill(address _acc) public {
+    function useFill(address _acc) public onlyOwner {
         usage[_acc].filled++;
     }
 
@@ -273,8 +271,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
     function register(address _acc) public onlyOwner {
         registered[_acc] = true;
-        usage[_acc].level = 1;
-        cTarifs[_acc].boughtAt = block.timestamp;
+        usage[_acc].level = 1;        
+        cTarifs[_acc].endsAt += 30 * 86400;
     }
 
     function cTarifExists(uint16 _tarifKey) public view returns (bool) {

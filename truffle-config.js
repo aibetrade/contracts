@@ -6,7 +6,12 @@ function loadNet(name) {
   const key = process.env[`NET_${name.toUpperCase()}_KEY`]
 
   const provider = new HDWalletProvider(key, rpc)
-  return { provider, network_id: "*" }
+  return {
+    provider,
+    network_id: "*",
+    gas: 8000000,
+    gasPrice: 3500000000,
+  }
 }
 
 /**
@@ -70,8 +75,11 @@ module.exports = {
 
   networks: {
     aibe: loadNet('aibe'),
+
     bsctest: loadNet('bsctest'),
-    mumbai: loadNet('mumbai')
+    bsc: loadNet('bsc'),
+
+    mumbai: loadNet('mumbai'),
   },
 
   // plugins: ["truffle-contract-size"],

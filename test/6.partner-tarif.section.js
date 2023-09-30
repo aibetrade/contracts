@@ -29,7 +29,7 @@ module.exports = () => {
 
     it("Can NOT buy next partner tarif only after 48h", async function () {
         const { uAcc, usersTarifsStore } = await init();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
 
         await mustFail(buyTarif(partnerTarifs[0], uAcc))
         await mustFail(buyTarif(partnerTarifs[1], uAcc))
@@ -41,19 +41,19 @@ module.exports = () => {
         const { uAcc, usersTree, usersTarifsStore, usersFinance, referal } = await init();
 
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);        
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);        
         await mustFail(buyTarif(partnerTarifs[0], uAcc))
         
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
         await buyTarif(partnerTarifs[1], uAcc)
 
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
         await buyTarif(partnerTarifs[2], uAcc)
 
         await span49h();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
         await buyTarif(partnerTarifs[3], uAcc)
     })
 
@@ -61,7 +61,14 @@ module.exports = () => {
         const { uAcc, usersTarifsStore } = await init();
 
         await span31d();
-        await usersTarifsStore.adminSetFilled(uAcc);
+        await span31d();
+        await span31d();
+        await span31d();
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+        const cTarif = await usersTarifsStore.cTarifs(uAcc)
+        console.log(Number(cTarif.boughtAt), Number(cTarif.endsAt))
+
         await mustFail(buyTarif(partnerTarifs[3], uAcc))
         
         await buyTarif(maxClientTarif(), uAcc)
@@ -73,7 +80,7 @@ module.exports = () => {
     //     const { uAcc, usersTarifsStore } = await init();
 
     //     await buyTarif(maxClientTarif(), uAcc)
-    //     await usersTarifsStore.adminSetFilled(uAcc);
+    //     await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
     //     await mustFail(buyTarif(partnerTarifs[3], uAcc))
         
     //     await buyTarif(maxClientTarif(), uAcc)

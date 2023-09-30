@@ -106,9 +106,9 @@ module.exports = async function (deployer, network, accounts) {
     rankMatrix: rankMatrix.address    
   }
 
-  if (network == 'test') return;
+  if (network != 'test')
+    writeFileSync(filename, JSON.stringify(data, null, 2))
   
-  writeFileSync(filename, JSON.stringify(data, null, 2))
   writeFileSync( __dirname + `/history/deploy.json`, JSON.stringify(data, null, 2))
   writeFileSync( __dirname + `/history/conf.json`, JSON.stringify(conf, null, 2))
 };
