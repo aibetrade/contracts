@@ -844,7 +844,7 @@ contract Referal is MultyOwner {
 
     function canTakeComsa(address _client) public view returns(bool){        
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
-        if (buy.tarif == 0 || buy.state == BUY_STATE_REJECTED) return false;
+        if (buy.tarif == 0 || buy.state == BUY_STATE_REJECTED || block.timestamp - buy.timestamp < 48 * 3600) return false;        
 
         return usersFinance.comsaExists(_client);
     }
@@ -910,10 +910,13 @@ contract Referal is MultyOwner {
                 uint8 mentorRank = usersTarifsStore.ranks(mentor);
                 uint8 perc = rankMatrix.matrix(rankMatrix.toKey(mentorRank, level));
 
-                uint32 lvCent = basePriceCent * perc / 100;
-                usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
-                curPriceCent -= lvCent;
-                level++;
+                // Change level only if there was a payment
+                if (perc > 0){
+                    uint32 lvCent = basePriceCent * perc / 100;
+                    usersFinance.makePayment(_client, mentor, lvCent, PAY_CODE_PAR_RANK);
+                    curPriceCent -= lvCent;                
+                    level++;
+                }
             }
 
             mentor = usersTree.getMentor(mentor);
