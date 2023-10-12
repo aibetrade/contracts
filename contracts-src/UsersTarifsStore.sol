@@ -121,7 +121,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             tarif: _tarif,
             timestamp: block.timestamp,
             count: 1,
-            state: 0
+            state: 0,
+            payedCent: TarifDataLib.getPrice(_tarif) * 100
         }));
     }
 
@@ -166,6 +167,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
             usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
         }
+
+        
 
         usersFinance.addUserBuy(_acc,
             BuyHistoryRec({

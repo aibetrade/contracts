@@ -266,6 +266,7 @@ struct BuyHistoryRec {
     uint256 tarif;
     uint16 count; // How many tarifs was bought
     uint8 state;
+    uint32 payedCent;
 }
 
 struct UserFinanceRec {
@@ -293,7 +294,7 @@ contract UsersFinanceStore is MultyOwner {
     }
 
     function getLastBuy(address _acc) public view returns (BuyHistoryRec memory) {
-        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(0, 0, 0, 0);
+        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(0, 0, 0, 0, 0);
         return users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
     }
 
@@ -329,9 +330,7 @@ contract UsersFinanceStore is MultyOwner {
         BuyHistoryRec storage buy = users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
         buy.state = BUY_STATE_REJECTED;
         
-        uint32 price = TarifDataLib.getPrice(buy.tarif);
-        uint32 count = buy.count;
-        erc20.transfer(_acc, centToErc20(count * price * 100));
+        erc20.transfer(_acc, buy.payedCent);
         comsaExists[_acc] = false;
     }
 
@@ -474,7 +473,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             tarif: _tarif,
             timestamp: block.timestamp,
             count: 1,
-            state: 0
+            state: 0,
+            payedCent: TarifDataLib.getPrice(_tarif) * 100
         }));
     }
 
@@ -519,6 +519,8 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             usage[_acc].freeSlots = TarifDataLib.getNumSlots(_tarif);
             usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
         }
+
+        
 
         usersFinance.addUserBuy(_acc,
             BuyHistoryRec({
