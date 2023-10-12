@@ -133,7 +133,7 @@ module.exports = () => {
 
         console.log('diff after', bal.diff().ext2)
     })
-*/
+
     it("Check Team bonus over 0 rank (keep level)", async function () {
         // Build net cli->rank10->rank0->rank10
         const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTarifsStore, usersTree, referal, usersFinance } = await init();
@@ -216,5 +216,95 @@ module.exports = () => {
             assert.equal(ext2.m4Acc.B, 51.94)
             assert.equal(ext2.m5Acc.B, 51.94)
         }        
+    })
+*/
+    it("Check upgrade ptarif price=(newprice-curprice)*count", async function () {
+        const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTarifsStore, usersTree, referal, usersFinance } = await init();
+
+        span49h()
+        await usersTree.adminSetMentor(m1Acc, m2Acc)
+        await usersTarifsStore.adminSetCTarif(m1Acc, maxClientTarif().pack())
+
+        // Extend lvl 1 to 2
+        {
+            await usersTarifsStore.adminSetPTarif(m1Acc, partnerTarifs[0].pack(), 1)
+            await usersTarifsStore.setUsage(m1Acc, 1000, 1000, 1000)
+            const nbc = Number(await usersTarifsStore.getNextBuyCount(m1Acc, partnerTarifs[0].key))
+            const nbl = Number(await usersTarifsStore.getNextLevel(m1Acc, partnerTarifs[0].key))
+            assert.equal(nbc, 1)
+            assert.equal(nbl, 2)
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[0], m1Acc)
+            await bal.append()
+            const { ext2 } = bal.diff()
+            console.log(ext2)
+
+            assert.equal(ext2.m1Acc.B, -120)
+            await usersTarifsStore.reject({ from: m1Acc })
+        }
+
+        // Extend lvl 10 to 11
+        {
+            await usersTarifsStore.adminSetPTarif(m1Acc, partnerTarifs[0].pack(), 10)
+            await usersTarifsStore.setUsage(m1Acc, 1000, 1000, 1000)
+            const nbc = Number(await usersTarifsStore.getNextBuyCount(m1Acc, partnerTarifs[0].key))
+            const nbl = Number(await usersTarifsStore.getNextLevel(m1Acc, partnerTarifs[0].key))
+            assert.equal(nbc, 1)
+            assert.equal(nbl, 11)
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[0], m1Acc)
+            await bal.append()
+            const { ext2 } = bal.diff()
+            console.log(ext2)
+
+            assert.equal(ext2.m1Acc.B, -120)
+            await usersTarifsStore.reject({ from: m1Acc })
+        }
+
+        // Upgrade lvl 1
+        {
+            await usersTarifsStore.adminSetPTarif(m1Acc, partnerTarifs[0].pack(), 1)
+            await usersTarifsStore.setUsage(m1Acc, 1000, 1000, 1000)
+            const nbc = Number(await usersTarifsStore.getNextBuyCount(m1Acc, partnerTarifs[1].key))
+            const nbl = Number(await usersTarifsStore.getNextLevel(m1Acc, partnerTarifs[1].key))
+            assert.equal(nbc, 1)
+            assert.equal(nbl, 1)
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[1], m1Acc)
+            await bal.append()
+            const { ext2 } = bal.diff()
+            console.log(ext2)
+
+            assert.equal(ext2.m1Acc.B, -350 + 120)
+            await usersTarifsStore.reject({ from: m1Acc })
+        }
+
+        // Upgrade lvl 10
+        {
+            await usersTarifsStore.adminSetPTarif(m1Acc, partnerTarifs[0].pack(), 10)
+            await usersTarifsStore.setUsage(m1Acc, 1000, 1000, 1000)
+            const nbc = Number(await usersTarifsStore.getNextBuyCount(m1Acc, partnerTarifs[1].key))
+            const nbl = Number(await usersTarifsStore.getNextLevel(m1Acc, partnerTarifs[1].key))
+            assert.equal(nbc, 10)
+            assert.equal(nbl, 10)
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[1], m1Acc)
+            await bal.append()
+            const { ext2 } = bal.diff()
+            console.log(ext2)
+
+            assert.equal(ext2.m1Acc.B, (-350 + 120) * 10)
+            await usersTarifsStore.reject({ from: m1Acc })
+        }
+
+        console.log(partnerTarifs[0].price)
+        console.log(partnerTarifs[1].price)
+        console.log(partnerTarifs[2].price)
+        console.log(partnerTarifs[3].price)
+
     })
 }

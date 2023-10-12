@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./MultyOwner.sol";
+import "./utils/MultyOwner.sol";
 import "./Tarif.sol";
 import "./ERC20Token.sol";
 
@@ -16,9 +16,6 @@ uint8 constant PAY_CODE_REGISTER = 7;
 uint8 constant PAY_CODE_CLI_MATRIX = 8;
 uint8 constant PAY_CODE_CLI_LV = 9;
 uint8 constant PAY_CODE_PAR_RANK = 10;
-
-// uint8 constant PAY_CODE_LV = 4;
-// uint8 constant PAY_CODE_TEAM = 5;
 
 uint8 constant BUY_STATE_NEW = 0;
 uint8 constant BUY_STATE_REJECTED = 1;

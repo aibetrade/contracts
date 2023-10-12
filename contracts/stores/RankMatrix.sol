@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./MultyOwner.sol";
+import "../apps/BaseApp.sol";
 
-contract RankMatrix is MultyOwner {
-    constructor() {}
-
+contract RankMatrix is BaseApp {
     uint8 public maxRank;
     uint8 public maxLevel;
     mapping(uint16 => uint8) public matrix;
@@ -18,7 +16,7 @@ contract RankMatrix is MultyOwner {
         return (uint8((key >> 8) & 0xFF), uint8(key & 0xFF));
     }
 
-    function setMatrix(uint16[] calldata _keys, uint8[] calldata _values) public onlyOwner{
+    function setMatrix(uint16[] calldata _keys, uint8[] calldata _values) public onlyMember{
         uint8 maxRank_ = 0;
         uint8 maxLevel_ = 0;
 

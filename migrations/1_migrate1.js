@@ -8,12 +8,19 @@ var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
 const RankMatrix = artifacts.require("RankMatrix");
+const AppStore = artifacts.require("AppStore");
 
 const { writeFileSync } = require('fs');
 const tarifsConf = require('./conf/tarifs.json');
 const { TarifData } = require('../utils/tarif');
 const { allRanks } = require('../test/utils-conf');
 // const { allRanks } = require('../test/utils-tarifs');
+
+// uint64 constant APP_STORE_CODE = 1;
+// uint64 constant REFERAL_APP_CODE = 2;
+// uint64 constant COMSAS_STORE_CODE = 3;
+// uint64 constant USERS_TREE_CODE = 4;
+
 
 async function baseInstllation(deployer, network, accounts) {
   network = network || ''
@@ -34,6 +41,11 @@ async function baseInstllation(deployer, network, accounts) {
 
   // --- Libs
   await deployer.deploy(TarifDataLib);
+
+  const appStore = await deployer.deploy(AppStore);
+  console.log(appStore)
+return
+
 
   // --- Users tree
   await deployer.deploy(UsersTreeStore);

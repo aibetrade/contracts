@@ -7,12 +7,15 @@
     "test": "test"
   },
   "scripts": {
-    "test": "npm run flat && truffle test",
+    "test_plain": "npm run flat && truffle test",
+    "test_plain:watch": "nodemon --ext js,sol -i plain.sol --exec npm run test_plain",
+
+    "test": "truffle test",
     "test:watch": "nodemon --ext js,sol -i plain.sol --exec npm run test",
     "size": "truffle run contract-size",
     "test:aibe": "truffle test --network aibe",
 
-    "_make_flat": "npx truffle-flattener ./contracts-src/Referal.sol > ./contracts/plain.sol",
+    "_make_flat": "npx truffle-flattener ./contracts-src/apps/ReferalApp.sol > ./contracts/plain.sol",
     "_clean_flat": "node ./utils/clean-flat.js",
     "flat": "npm run _make_flat && npm run _clean_flat"
   },

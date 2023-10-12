@@ -2,16 +2,19 @@
 pragma solidity ^0.8.0;
 
 import "./Tarif.sol";
-import "./MultyOwner.sol";
+import "./utils/MultyOwner.sol";
 import "./UsersTarifsStore.sol";
 import "./UsersTreeStore.sol";
 import "./UsersFinanceStore.sol";
 import "./RankMatrix.sol";
+import "./stores/AppStore.sol";
 
 contract Referal is MultyOwner {
     UsersTarifsStore public usersTarifsStore;
     UsersFinanceStore public usersFinance;
+    AppStore public appStore;
     
+
     function setUsersTarifsStore(address _usersTarifsStoreAddress) public onlyOwner {
         require(_usersTarifsStoreAddress != address(0));
         usersTarifsStore = UsersTarifsStore(_usersTarifsStoreAddress);
@@ -291,7 +294,13 @@ contract Referal is MultyOwner {
 
         require(buyCount > 0);
 
-        usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
+        if (usersTarifsStore.isPartnerActive(msg.sender) && (level == usersTarifsStore.getLevel(msg.sender))){
+            uint256 pt = usersTarifsStore.pTarif(msg.sender);
+            usersFinance.freezeMoney((TarifDataLib.getPrice(tarif) - TarifDataLib.getPrice(pt)) * buyCount, msg.sender);
+        }
+        else{
+            usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
+        }
 
         // Если есть невзятая комиссия, то забрать ее. Иначе просто запомнить текущий платеж.
         usersTarifsStore.newPartnerTarif(msg.sender, tarif, buyCount, level);
