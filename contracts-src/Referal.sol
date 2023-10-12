@@ -245,7 +245,8 @@ contract Referal is MultyOwner {
                 tarif: 65535,
                 timestamp: block.timestamp,
                 count: 1,
-                state: BUY_STATE_ACCEPTED
+                state: BUY_STATE_ACCEPTED,
+                payedCent: registerPrice * 100
             })
         );
         // usersTarifsStore.newPartnerTarif(msg.sender, REGISTRATION_KEY, 1, 1);
@@ -268,7 +269,6 @@ contract Referal is MultyOwner {
         // Если предыдущую комсу не забрали, заберем ее.
         if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
-        usersFinance.freezeMoney(TarifDataLib.getPrice(tarif), msg.sender);
         usersTarifsStore.newClientTarif(msg.sender, tarif);        
         processComsa(msg.sender);
     }
@@ -286,14 +286,14 @@ contract Referal is MultyOwner {
         // Если предыдущую комсу не забрали, заберем ее.
         if (usersFinance.comsaExists(msg.sender)) processComsa(msg.sender);
 
-        uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
-        uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
+        // uint16 buyCount = usersTarifsStore.getNextBuyCount(msg.sender, _tarifKey);
+        // uint16 level = usersTarifsStore.getNextLevel(msg.sender, _tarifKey);
 
-        require(buyCount > 0);
+        // require(buyCount > 0);
 
-        usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
+        // usersFinance.freezeMoney(TarifDataLib.getPrice(tarif) * buyCount, msg.sender);
 
         // Если есть невзятая комиссия, то забрать ее. Иначе просто запомнить текущий платеж.
-        usersTarifsStore.newPartnerTarif(msg.sender, tarif, buyCount, level);
+        usersTarifsStore.newPartnerTarif(msg.sender, tarif);
     }
 }
