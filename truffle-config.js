@@ -1,34 +1,18 @@
 require('dotenv').config()
-// const Web3 = require("web3");
-// const PrivateKeyProvider = require("truffle-privatekey-provider");
 const HDWalletProvider = require('@truffle/hdwallet-provider');
-
-// const url = `https://eth.aibetradedev.ru:443/`
-// const pk = '0x69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
-
-// const mnemonic = '69217094baeddf8f472ec57f50c8102171c2989c4aac790ccbde6e75427b6500'
-
-// const web3 = new Web3.providers.HttpProvider('https://eth.aibetradedev.ru/');
 
 function loadNet(name) {
   const rpc = process.env[`NET_${name.toUpperCase()}_RPC`]
   const key = process.env[`NET_${name.toUpperCase()}_KEY`]
 
   const provider = new HDWalletProvider(key, rpc)
-
-  // const provider = () => new Web3(hdProvider)
-  return { provider, network_id: "*", timeoutBlocks: 200,}
+  return {
+    provider,
+    network_id: "*",
+    gas: 8000000,
+    gasPrice: 3500000000,
+  }
 }
-
-// async function aaa() {
-//   const { provider } = loadNet('aibe2')
-//   const bb = await provider.eth.getBlock("latest")
-//   console.log(bb)
-// }
-
-// aaa()
-// return
-
 
 /**
  * Use this file to configure your truffle project. It's seeded with some
@@ -90,71 +74,15 @@ module.exports = {
    */
 
   networks: {
-    // Useful for testing. The `development` name is special - truffle uses it by default
-    // if it's defined here and no other network is specified at the command line.
-    // You should run a client (like ganache, geth, or parity) in a separate terminal
-    // tab if you use this network and you must also set the `host`, `port` and `network_id`
-    // options below to some value.
-    //
-    // development: {
-    //  host: "127.0.0.1",     // Localhost (default: none)
-    //  port: 8545,            // Standard Ethereum port (default: none)
-    //  network_id: "*",       // Any network (default: none)
-    // },
-    // aibe: {
-    //   provider: () => web3,
-    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
-    //   //  port: 443,            // Standard Ethereum port (default: none)
-    //   network_id: "*",       // Any network (default: none)
-    // },
-
     aibe: loadNet('aibe'),
-    // aibe2: loadNet('aibe2'),
+
     bsctest: loadNet('bsctest'),
-    // {
-    //   provider: () => web3,
-    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
-    //   //  port: 443,            // Standard Ethereum port (default: none)
-    //   network_id: "*",       // Any network (default: none)
-    // },
+    bsc: loadNet('bsc'),
 
-    // bsctest: {
-    //   provider: () => new HDWalletProvider(mnemonic, `https://data-seed-prebsc-1-s1.binance.org:8545/`),
-    //   //  host: "https://eth.aibetradedev.ru",     // Localhost (default: none)
-    //   //  port: 443,            // Standard Ethereum port (default: none)
-    //   network_id: "*",       // Any network (default: none)
-    // }
-
-    //
-    // An additional network, but with some advanced options…
-    // advanced: {
-    //   port: 8777,             // Custom port
-    //   network_id: 1342,       // Custom network
-    //   gas: 8500000,           // Gas sent with each transaction (default: ~6700000)
-    //   gasPrice: 20000000000,  // 20 gwei (in wei) (default: 100 gwei)
-    //   from: <address>,        // Account to send transactions from (default: accounts[0])
-    //   websocket: true         // Enable EventEmitter interface for web3 (default: false)
-    // },
-    //
-    // Useful for deploying to a public network.
-    // Note: It's important to wrap the provider as a function to ensure truffle uses a new provider every time.
-    // goerli: {
-    //   provider: () => new HDWalletProvider(MNEMONIC, `https://goerli.infura.io/v3/${PROJECT_ID}`),
-    //   network_id: 5,       // Goerli's id
-    //   confirmations: 2,    // # of confirmations to wait between deployments. (default: 0)
-    //   timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
-    //   skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )
-    // },
-    //
-    // Useful for private networks
-    // private: {
-    //   provider: () => new HDWalletProvider(MNEMONIC, `https://network.io`),
-    //   network_id: 2111,   // This network is yours, in the cloud.
-    //   production: true    // Treats this network as if it was a public net. (default: false)
-    // }
+    mumbai: loadNet('mumbai'),
   },
 
-  plugins: ["truffle-contract-size"],
+  // plugins: ["truffle-contract-size"],
 
   // Set default mocha options here, use special reporters, etc.
   mocha: {
@@ -168,13 +96,15 @@ module.exports = {
       // docker: true,        // Use "0.5.1" you've installed locally with docker (default: false)
       // settings: {          // See the solidity docs for advice about optimization and evmVersion
       optimizer: {
-        enabled: true,
+        enabled: false,
         runs: 10
       },
       //  evmVersion: "byzantium"
       // }
     }
   },
+
+  plugins: ['truffle-plugin-verify']
 
   // Truffle DB is currently disabled by default; to enable it, change enabled:
   // false to enabled: true. The default storage location can also be

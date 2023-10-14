@@ -1,7 +1,8 @@
 const { TarifData } = require("../utils/tarif");
+const { clientTarifs, partnerTarifs, inviteBonusHash } = require("./utils-conf");
 // const { inviteBonusHash } = require("./tarifs-data");
 const { init, mustFail } = require("./utils-system");
-const { setCTarifs, setPTarifs, clientTarifs, partnerTarifs, setMatrix, inviteBonusHash } = require("./utils-tarifs");
+const { setCTarifs, setPTarifs, setMatrix } = require("./utils-tarifs");
 
 module.exports = () => {
     it("All accounts have access to contract", async function () {
@@ -38,12 +39,12 @@ module.exports = () => {
                 const bcTarif = TarifData.fromPack(allClientTarifs[i])
                 assert.deepEqual(bcTarif, clientTarifs[i])
 
-                const exists = await cliTarifs.exists(clientTarifs[i].pack())
+                const exists = await cliTarifs.exists(clientTarifs[i].key)
                 assert.equal(exists, true)
             }
 
             for (let i = 0; i < partnerTarifs.length; i++) {
-                const exists = await cliTarifs.exists(partnerTarifs[i].pack())
+                const exists = await cliTarifs.exists(partnerTarifs[i].key)
                 assert.equal(exists, false)
             }
         }
@@ -63,12 +64,12 @@ module.exports = () => {
                 const bcTarif = TarifData.fromPack(allTarifs[i])
                 assert.deepEqual(bcTarif, partnerTarifs[i])
 
-                const exists = await parTarifs.exists(partnerTarifs[i].pack())
+                const exists = await parTarifs.exists(partnerTarifs[i].key)
                 assert.equal(exists, true)
             }
 
             for (let i = 0; i < clientTarifs.length; i++) {
-                const exists = await parTarifs.exists(clientTarifs[i].pack())
+                const exists = await parTarifs.exists(clientTarifs[i].key)
                 assert.equal(exists, false)
             }
         }

@@ -4,35 +4,37 @@ var UsersTarifsStore = artifacts.require("UsersTarifsStore");
 var UsersFinanceStore = artifacts.require("UsersFinanceStore");
 var UsersTreeStore = artifacts.require("UsersTreeStore");
 const TarifsStoreBase = artifacts.require("TarifsStoreBase");
+const RankMatrix = artifacts.require("RankMatrix");
 
-const { time } = require('@openzeppelin/test-helpers');
-const { web3 } = require('@openzeppelin/test-helpers/src/setup');
-const conf = require("../migrations/conf.json")
+const conf = require("../migrations/history/conf.json")
+const deploy = require("../migrations/history/deploy.json")
 
 const zeroAddress = '0x0000000000000000000000000000000000000000';
 const oneAddress = '0x0000000000000000000000000000000000000001';
 
 let stack = null
 
-
 async function init(isNew = false) {
     if (isNew || !stack) {
-        const accounts = await web3.eth.getAccounts()
-        const referal = await Referal.deployed()
+        const accounts = await web3.eth.getAccounts()        
+        const referal = await Referal.at(deploy.referal)
 
         const usersTarifsStore = await UsersTarifsStore.at(await referal.usersTarifsStore())
+        const usersFinance = await UsersFinanceStore.at(await referal.usersFinance())
 
         stack = {
             ...conf,
 
             referal,
-            erc20: await ERC20Token.deployed(),
+            // erc20: await ERC20Token.deployed(),
+            erc20: await ERC20Token.at(await usersFinance.erc20()),
             accounts,
             usersTarifsStore,
             cliTarifs: await TarifsStoreBase.at(await usersTarifsStore.clientTarifs()),
             parTarifs: await TarifsStoreBase.at(await usersTarifsStore.partnerTarifs()),
-            usersFinance: await UsersFinanceStore.at(await referal.usersFinance()),
+            usersFinance,
             usersTree: await UsersTreeStore.at(await referal.usersTree()),
+            rankMatrix: await RankMatrix.at(await referal.rankMatrix()),
 
             uAcc: accounts[1],
             m1Acc: accounts[2],
@@ -56,19 +58,28 @@ async function mustFail(prom) {
     throw "Must fail"
 }
 
+const span = async time => {
+    const body = JSON.stringify({ method: "evm_increaseTime", params: [time] })
+    await fetch(web3.currentProvider.host, { method: "POST", body })
+    await fetch(web3.currentProvider.host, { method: "POST", body: JSON.stringify({ method: "evm_mine", params: [] }) })
+}
+
 const span49h = async () => {
-    await time.increase(49 * 3600);
-    await time.advanceBlock();
+    return span(49 * 3600)
+    // await time.increase(49 * 3600);
+    // await time.advanceBlock();
 }
 
 const span31d = async () => {
-    await time.increase(31 * 24 * 3600);
-    await time.advanceBlock();
+    return span(31 * 24 * 3600)
+    // await time.increase(31 * 24 * 3600);
+    // await time.advanceBlock();
 }
 
 const span366d = async () => {
-    await time.increase(366 * 24 * 3600);
-    await time.advanceBlock();
+    return span(366 * 24 * 3600)
+    // await time.increase(366 * 24 * 3600);
+    // await time.advanceBlock();
 }
 
 module.exports = {
@@ -79,5 +90,5 @@ module.exports = {
     span49h,
     span31d,
     span366d,
-    mustFail
+    mustFail    
 }

@@ -1,6 +1,6 @@
+const { clientTarifs } = require("./utils-conf");
 const { buyTarif } = require("./utils-finance");
 const { init, oneAddress, zeroAddress, mustFail } = require("./utils-system");
-const { clientTarifs } = require("./utils-tarifs");
 
 module.exports = () => {
     it("Can not buy tarif without mentor", async function () {
@@ -47,4 +47,28 @@ module.exports = () => {
             assert.equal(mentor.toString(), zeroAddress);
         }
     })
+
+    it("Set password is correct", async function () {
+        const { referal, uAcc } = await init();
+
+        const pass = BigInt(web3.utils.sha3(Math.random().toString(36)))
+        
+        await referal.setPassword(pass, {from: uAcc})
+        const passAfter = BigInt(await referal.passwords(uAcc))
+
+        assert.equal(pass.toString(), passAfter.toString());
+    })
+
+    it("Change password is correct", async function () {
+        const { referal, uAcc } = await init();
+
+        const pass = BigInt(web3.utils.sha3(Math.random().toString(36)))
+        
+        await referal.setPassword(pass, {from: uAcc})
+        const passAfter = BigInt(await referal.passwords(uAcc))
+
+        assert.equal(pass.toString(), passAfter.toString());
+    })
+
+
 }

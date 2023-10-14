@@ -5,18 +5,38 @@ import "./MultyOwner.sol";
 import "./Tarif.sol";
 import "./ERC20Token.sol";
 
+uint8 constant PAY_CODE_INVITE_CLI = 1;
+uint8 constant PAY_CODE_INVITE_PAR = 2;
+uint8 constant PAY_CODE_COMPANY = 3;
+uint8 constant PAY_CODE_QUART_CLI = 4;
+uint8 constant PAY_CODE_QUART_PAR = 5;
+uint8 constant PAY_CODE_MAGIC = 6;
+uint8 constant PAY_CODE_REGISTER = 7;
+
+uint8 constant PAY_CODE_CLI_MATRIX = 8;
+uint8 constant PAY_CODE_CLI_LV = 9;
+uint8 constant PAY_CODE_PAR_RANK = 10;
+
+// uint8 constant PAY_CODE_LV = 4;
+// uint8 constant PAY_CODE_TEAM = 5;
+
+uint8 constant BUY_STATE_NEW = 0;
+uint8 constant BUY_STATE_REJECTED = 1;
+uint8 constant BUY_STATE_ACCEPTED = 2;
+
 struct PayHistoryRec {
     address from;
     uint256 timestamp;
     uint64 cents;
+    uint8 payCode;
 }
 
 struct BuyHistoryRec {
-    address from; // Needs for rollbacgetk
     uint256 timestamp;
     uint256 tarif;
     uint16 count; // How many tarifs was bought
-    bool rejected;
+    uint8 state;
+    uint32 payedCent;
 }
 
 struct UserFinanceRec {
@@ -30,7 +50,6 @@ contract UsersFinanceStore is MultyOwner {
 
     mapping(address => UserFinanceRec) public users;
     mapping(address => bool) public comsaExists;
-    mapping(address => uint256) public lastBuyTime;
 
     constructor(address _erc20) {
         erc20 = ERC20Token(_erc20);
@@ -40,16 +59,12 @@ contract UsersFinanceStore is MultyOwner {
         comsaExists[_acc] = _exists;
     }
 
-    function setLastBuyTime(address _acc, uint256 _timestamp) public onlyOwner {
-        lastBuyTime[_acc] = _timestamp;
-    }
-
     function setComsaTaken(address _acc) public onlyOwner {
         comsaExists[_acc] = false;
     }
 
     function getLastBuy(address _acc) public view returns (BuyHistoryRec memory) {
-        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(address(0), 0, 0, 0, false);
+        if (users[_acc].buyHistory.length == 0) return BuyHistoryRec(0, 0, 0, 0, 0);
         return users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
     }
 
@@ -83,11 +98,9 @@ contract UsersFinanceStore is MultyOwner {
 
     function rejectBuy(address _acc) public onlyOwner {        
         BuyHistoryRec storage buy = users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
-        buy.rejected = true;
+        buy.state = BUY_STATE_REJECTED;
         
-        uint32 price = TarifDataLib.getPrice(buy.tarif);
-        uint32 count = buy.count;
-        erc20.transfer(_acc, centToErc20(count * price * 100));
+        erc20.transfer(_acc, centToErc20(buy.payedCent));
         comsaExists[_acc] = false;
     }
 
@@ -99,8 +112,13 @@ contract UsersFinanceStore is MultyOwner {
         erc20.transferFrom(_from, address(this), centToErc20(dollar * 100));
     }
 
-    function makePayment(address _from, address _to, uint64 _cent) public onlyOwner {
+    function makePayment(address _from, address _to, uint64 _cent, uint8 _payCode) public onlyOwner {
         erc20.transfer(_to, centToErc20(_cent));
-        addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from}));
+        addUserPay(_to, PayHistoryRec({timestamp: block.timestamp, cents: _cent, from: _from, payCode: _payCode}));
+
+        if (users[_to].buyHistory.length == 0) return;
+        BuyHistoryRec storage buy = users[_to].buyHistory[users[_to].buyHistory.length - 1];
+        if (buy.state == 0)
+        buy.state = BUY_STATE_ACCEPTED;
     }
 }

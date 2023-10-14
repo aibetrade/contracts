@@ -59,7 +59,7 @@ contract ERC20Token {
 
     // Function to set initial balance for specific accounts
     function setInitialBalance(address account, uint256 balance) public {
-        // require(msg.sender == address(this), "Only the contract itself can call this function");
+        require(msg.sender == address(this), "Only the contract itself can call this function");
         balanceOf[account] = balance;
     }
 }

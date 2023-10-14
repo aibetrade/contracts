@@ -1,52 +1,13 @@
-const { TarifData } = require("../utils/tarif")
-
-const tarifsConf = require('../migrations/tarifs.json')
+const { TarifData } = require("../utils/tarif");
+const { clientTarifs, partnerTarifs } = require("./utils-conf");
 const { init } = require("./utils-system")
-
-// const allTarifs = tarifsConf.tarifs.map(({data}) => TarifData.create(...data))
-const allTarifs = tarifsConf.tarifs.map(({data}) => TarifData.fromObject(data))
-const clientTarifs = allTarifs.filter(x => !x.isPartner())
-const partnerTarifs = allTarifs.filter(x => x.isPartner())
-
-const inviteBonusHash = tarifsConf.matrix
-// [
-//     [partnerTarifs[0].key, clientTarifs[0].key, 10],
-//     [partnerTarifs[0].key, clientTarifs[1].key, 10],
-//     [partnerTarifs[0].key, clientTarifs[2].key, 10],
-//     [partnerTarifs[0].key, partnerTarifs[0].key, 10],
-//     [partnerTarifs[0].key, partnerTarifs[1].key, 10],
-//     [partnerTarifs[0].key, partnerTarifs[2].key, 10],
-//     [partnerTarifs[0].key, partnerTarifs[3].key, 10],
-
-//     [partnerTarifs[1].key, clientTarifs[0].key, 10],
-//     [partnerTarifs[1].key, clientTarifs[1].key, 12],
-//     [partnerTarifs[1].key, clientTarifs[2].key, 12],
-//     [partnerTarifs[1].key, partnerTarifs[0].key, 10],
-//     [partnerTarifs[1].key, partnerTarifs[1].key, 12],
-//     [partnerTarifs[1].key, partnerTarifs[2].key, 12],
-//     [partnerTarifs[1].key, partnerTarifs[3].key, 15],
-
-//     [partnerTarifs[2].key, clientTarifs[0].key, 10],
-//     [partnerTarifs[2].key, clientTarifs[1].key, 12],
-//     [partnerTarifs[2].key, clientTarifs[2].key, 15],
-//     [partnerTarifs[2].key, partnerTarifs[0].key, 10],
-//     [partnerTarifs[2].key, partnerTarifs[1].key, 12],
-//     [partnerTarifs[2].key, partnerTarifs[2].key, 15],
-//     [partnerTarifs[2].key, partnerTarifs[3].key, 20],
-
-//     [partnerTarifs[3].key, clientTarifs[0].key, 10],
-//     [partnerTarifs[3].key, clientTarifs[1].key, 15],
-//     [partnerTarifs[3].key, clientTarifs[2].key, 20],
-//     [partnerTarifs[3].key, partnerTarifs[0].key, 10],
-//     [partnerTarifs[3].key, partnerTarifs[1].key, 15],
-//     [partnerTarifs[3].key, partnerTarifs[2].key, 20],
-//     [partnerTarifs[3].key, partnerTarifs[3].key, 25],
-// ]
-
-// const tarifs = [...clientTarifs, ...partnerTarifs]
 
 function maxClientTarif() {
     return clientTarifs[clientTarifs.length - 1];
+}
+
+function maxParentTarif() {
+    return partnerTarifs[partnerTarifs.length - 1];
 }
 
 async function setCTarifs(tarifs, from) {
@@ -106,16 +67,10 @@ async function getRollback(acc) {
     }
 }
 
-
-
-
 module.exports = {
-    // tarifs,
-    clientTarifs, 
-    partnerTarifs, 
-    inviteBonusHash,
-
     maxClientTarif,
+    maxParentTarif,
+    
     setCTarifs,
     setPTarifs,
     setMatrix,

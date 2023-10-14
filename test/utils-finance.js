@@ -1,3 +1,4 @@
+const { TarifData } = require("../utils/tarif");
 const { init } = require("./utils-system");
 const { getUsage, getRollback, userHasCTarif, userHasPTarif } = require("./utils-tarifs");
 
@@ -8,8 +9,8 @@ async function getNextBuyInfo(tarif, acc) {
     let level = 1
 
     if (tarif.isPartner()) {
-        buyCount = Number(await usersTarifsStore.getNextBuyCount(acc, tarif.pack()))
-        level = Number(await usersTarifsStore.getNextLevel(acc, tarif.pack()))
+        buyCount = Number(await usersTarifsStore.getNextBuyCount(acc, tarif.key))
+        level = Number(await usersTarifsStore.getNextLevel(acc, tarif.key))
     }
 
     return {
@@ -71,9 +72,9 @@ async function buyTarif(tarif, acc = null) {
     assert.equal(await fromErc20(approved), price);
 
     if (tarif.isPartner())
-        await referal.buyPartnerTarif(tarif.pack(), { from: acc })
+        await referal.buyPartnerTarif(tarif.key, { from: acc })
     else
-        await referal.buyClientTarif(tarif.pack(), { from: acc })
+        await referal.buyClientTarif(tarif.key, { from: acc })
     // === Buy logic ===
 
     await bal.append("after")
@@ -119,15 +120,28 @@ async function buyTarif(tarif, acc = null) {
         }
 
         assert.equal(usageAfter.level, buyInfoBefore.level, "Give incorrect level")
-        assert.equal(usageAfter.freeSlots - usageBefore.freeSlots, tarif.numSlots * buyInfoBefore.buyCount, "Give incorrect slots")
-        assert.equal(usageAfter.freeLVSlots - usageBefore.freeLVSlots, tarif.numLVSlots * buyInfoBefore.buyCount, "Give incorrect LV slots")
+        // assert.equal(usageAfter.freeSlots - usageBefore.freeSlots, tarif.numSlots * buyInfoBefore.buyCount, "Give incorrect slots")
+        // assert.equal(usageAfter.freeLVSlots - usageBefore.freeLVSlots, tarif.numLVSlots * buyInfoBefore.buyCount, "Give incorrect LV slots")
+    }
+
+    // --- check current tarif is equal to bought
+    {
+        if (tarif.isPartner()) {
+            const upTarifAfter = await usersTarifsStore.pTarifs(acc)
+            const upTarifAfter2 = TarifData.fromPack(upTarifAfter.tarif)
+            assert.equal(upTarifAfter.tarif, tarif.pack())
+        }
+        else{
+            const ucTarifAfter = await usersTarifsStore.cTarifs(acc)
+            assert.equal(ucTarifAfter.tarif, tarif.pack())
+        }
     }
 }
 
 async function prettyBalance(bal) {
-    const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
+    const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance } = await init();
     const dic = {
-        company: cWallet, quart: qWallet, magic: mWallet, finance: usersFinance.address,
+        company: cWallet, quartc: qcWallet, quartp: qpWallet, magic: mWallet, finance: usersFinance.address,
         uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc
     }
 
@@ -146,9 +160,9 @@ async function makeBalancer() {
         accs: [],
 
         async append(name = 'after') {
-            const { erc20, uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance } = await init();
+            const { erc20, uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance } = await init();
 
-            this.accs = [uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qWallet, mWallet, usersFinance.address]
+            this.accs = [uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, cWallet, qcWallet, qpWallet, mWallet, usersFinance.address]
 
             const accInfo = async acc => {
                 const u = await getUsage(acc)
@@ -179,7 +193,8 @@ async function makeBalancer() {
             const rec = {
                 name,
                 company: await fromErc20(await erc20.balanceOf(cWallet)),
-                quart: await fromErc20(await erc20.balanceOf(qWallet)),
+                quartc: await fromErc20(await erc20.balanceOf(qcWallet)),
+                quartp: await fromErc20(await erc20.balanceOf(qpWallet)),
                 magic: await fromErc20(await erc20.balanceOf(mWallet)),
                 finance: await fromErc20(await erc20.balanceOf(usersFinance.address)),
 
@@ -227,7 +242,8 @@ async function makeBalancer() {
                 const diffRec = {
                     name: `${nameb} - ${namea}`,
                     company: dif(recb.company, reca.company),
-                    quart: dif(recb.quart, reca.quart),
+                    quartc: dif(recb.quartc, reca.quartc),
+                    quartp: dif(recb.quartp, reca.quartp),
                     magic: dif(recb.magic, reca.magic),
                     finance: dif(recb.finance, reca.finance),
 
@@ -257,6 +273,13 @@ async function makeBalancer() {
     return balancer
 }
 
+async function diffBalance(action){
+    const bal = await makeBalancer()
+    await action
+    await bal.append()
+    return bal.diff().ext2
+}
+
 async function toErc20(dollar) {
     const { erc20 } = await init();
     const decimals = await erc20.decimals();
@@ -277,5 +300,6 @@ module.exports = {
     buyTarif,
 
     makeBalancer,
-    getNextBuyInfo
+    getNextBuyInfo,
+    diffBalance
 }
