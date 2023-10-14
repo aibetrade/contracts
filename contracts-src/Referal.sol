@@ -180,7 +180,7 @@ contract Referal is MultyOwner {
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
 
         uint256 _tarif = buy.tarif;
-        uint32 basePriceCent = uint32(buy.count) * TarifDataLib.getPrice(_tarif) * 100;        
+        uint32 basePriceCent = buy.payedCent;
 
         uint32 curPriceCent = basePriceCent;
         usersTarifsStore.useFill(mentor);
@@ -280,7 +280,7 @@ contract Referal is MultyOwner {
         require(
             usersTarifsStore.registered(msg.sender)
             && usersTarifsStore.hasActiveMaxClientTarif(msg.sender)
-            && usersTarifsStore.isPartnerFullfilled(msg.sender)
+            && (!usersTarifsStore.isPartnerTarifActive(msg.sender) || usersTarifsStore.isPartnerFullfilled(msg.sender))
             && canBuy(msg.sender), "E118");
 
         // Если предыдущую комсу не забрали, заберем ее.

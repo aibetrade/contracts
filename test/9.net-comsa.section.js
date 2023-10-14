@@ -1,11 +1,9 @@
 const { partnerTarifs, clientTarifs } = require("./utils-conf");
-const { makeBalancer, buyTarif } = require("./utils-finance");
-const { init, span49h, mustFail } = require("./utils-system");
-const { maxClientTarif, maxParentTarif } = require("./utils-tarifs");
+const { makeBalancer, buyTarif, diffBalance } = require("./utils-finance");
+const { init, span49h, mustFail, span366d } = require("./utils-system");
+const { maxClientTarif, maxParentTarif, getUsage } = require("./utils-tarifs");
 
 module.exports = () => {
-
-    /*
     it("Build net uAcc -> m1Acc -> m2Acc -> m3Acc -> m4Acc -> m5Acc", async function () {
         const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTree, usersTarifsStore } = await init();
 
@@ -57,10 +55,10 @@ module.exports = () => {
         await buyTarif(clientTarifs[0], uAcc)
 
         await bal.append()
-        console.log(bal.diff().ext2)
+        // console.log(bal.diff().ext2)
 
         const pays = await usersFinance.getPayHistory(m1Acc)
-        console.log(pays)
+        // console.log(pays)
     })
 
     it("Set all pTarif 3", async function () {
@@ -97,7 +95,7 @@ module.exports = () => {
         await buyTarif(clientTarifs[0], uAcc)
         await bal.append()
 
-        console.log('diff2', bal.diff().ext2)
+        // console.log('diff2', bal.diff().ext2)
     })
 
     it("uAcc buy pTarif and processComsa", async function () {
@@ -122,18 +120,18 @@ module.exports = () => {
         assert.equal(await referal.canTakeComsa(uAcc), true)
 
         await bal.append()
-        console.log(bal)
+        // console.log(bal)
 
         const buy = await usersFinance.getLastBuy(uAcc)
-        console.log(buy)
+        // console.log(buy)
 
         await referal.takeComsa(uAcc)
 
         await bal.append()
 
-        console.log('diff after', bal.diff().ext2)
+        // console.log('diff after', bal.diff().ext2)
     })
-*/
+
     it("Check Team bonus over 0 rank (keep level)", async function () {
         // Build net cli->rank10->rank0->rank10
         const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTarifsStore, usersTree, referal, usersFinance } = await init();
@@ -152,7 +150,7 @@ module.exports = () => {
         await usersTarifsStore.adminSetCTarif(m4Acc, maxClientTarif().pack())
         await usersTarifsStore.adminSetCTarif(m5Acc, maxClientTarif().pack())
 
-        
+
         await usersTarifsStore.adminSetPTarif(m1Acc, maxParentTarif().pack(), 1)
         await usersTarifsStore.adminSetPTarif(m2Acc, maxParentTarif().pack(), 1)
         await usersTarifsStore.adminSetPTarif(m3Acc, maxParentTarif().pack(), 1)
@@ -179,7 +177,7 @@ module.exports = () => {
             await span49h()
             assert.equal(await referal.canTakeComsa(uAcc), true)
 
-            const bal = await makeBalancer()            
+            const bal = await makeBalancer()
             await referal.takeComsa(uAcc)
             await bal.append()
 
@@ -215,6 +213,271 @@ module.exports = () => {
             assert.equal(ext2.m3Acc.B, 64.93)
             assert.equal(ext2.m4Acc.B, 51.94)
             assert.equal(ext2.m5Acc.B, 51.94)
-        }        
+        }
+    })
+
+    it("Buy pTarif (from none)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetPTarif(uAcc, 0, 1)
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[0], uAcc))
+            assert.equal(dif.uAcc.B, -120)
+            assert.equal(dif.finance.B, 120)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 10, freeLVSlots: 0, level: 1, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 120)
+            assert.equal(dif.finance.B, -120)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 0, freeLVSlots: 0, level: 1, filled: 0 })
+        }
+    })
+
+    it("Buy pTarif (was incorrect level)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetPTarif(uAcc, 0, 100)
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[0], uAcc))
+            assert.equal(dif.uAcc.B, -120)
+            assert.equal(dif.finance.B, 120)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 10, freeLVSlots: 0, level: 1, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 120)
+            assert.equal(dif.finance.B, -120)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 0, freeLVSlots: 0, level: 100, filled: 0 })
+        }
+    })
+
+
+    it("Buy pTarif (was dead lower level)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 100)
+        await span366d()
+        // console.log(await usersTarifsStore.isPartnerTarifActive(uAcc))
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[1], uAcc))
+            assert.equal(dif.uAcc.B, -350)
+            assert.equal(dif.finance.B, 350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 20, freeLVSlots: 0, level: 1, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 350)
+            assert.equal(dif.finance.B, -350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 1000, freeLVSlots: 0, level: 100, filled: 0 })
+        }
+    })
+
+    it("Buy pTarif (was dead upper level)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[2].pack(), 100)
+        await span366d()
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[1], uAcc))
+            assert.equal(dif.uAcc.B, -350)
+            assert.equal(dif.finance.B, 350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 20, freeLVSlots: 0, level: 1, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 350)
+            assert.equal(dif.finance.B, -350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 4000, freeLVSlots: 4000, level: 100, filled: 0 })
+
+        }
+    })
+
+    it("Buy pTarif (was alive not/filled lower)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 100)
+
+        await mustFail(buyTarif(partnerTarifs[1], uAcc))
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[1], uAcc))
+            assert.equal(dif.uAcc.B, -23000)
+            assert.equal(dif.finance.B, 23000)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 2000, freeLVSlots: 0, level: 100, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 23000)
+            assert.equal(dif.finance.B, -23000)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 0, freeLVSlots: 0, level: 100, filled: 100 })
+        }
+    })
+
+
+    it("Buy pTarif (was alive not/filled the same)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[1].pack(), 100)
+
+        await mustFail(buyTarif(partnerTarifs[1], uAcc))
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+        {
+            const dif = await diffBalance(buyTarif(partnerTarifs[1], uAcc))
+            assert.equal(dif.uAcc.B, -350)
+            assert.equal(dif.finance.B, 350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 20, freeLVSlots: 0, level: 101, filled: 0 })
+        }
+
+        {
+            const dif = await diffBalance(usersTarifsStore.reject({ from: uAcc }))
+            assert.equal(dif.uAcc.B, 350)
+            assert.equal(dif.finance.B, -350)
+            const usage = await getUsage(uAcc)
+            assert.deepEqual(usage, { freeSlots: 0, freeLVSlots: 0, level: 100, filled: 100 })
+        }
+    })
+
+    it("Buy pTarif (was alive filled upper)", async function () {
+        const { uAcc, m1Acc, usersTarifsStore, usersTree, referal } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[2].pack(), 100)
+
+        await mustFail(buyTarif(partnerTarifs[1], uAcc))
+
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+        await mustFail(buyTarif(partnerTarifs[1], uAcc))
+    })
+
+    it("Check extend tarif price is ok, rollback and comsa ok", async function () {
+        // Build net cli->rank10->rank0->rank10
+        const { uAcc, m1Acc, m2Acc, m3Acc, m4Acc, m5Acc, usersTarifsStore, usersTree, referal, usersFinance } = await init();
+
+        await usersTree.adminSetMentor(uAcc, m1Acc)
+
+        await usersTarifsStore.adminSetCTarif(uAcc, maxClientTarif().pack())
+        await usersTarifsStore.adminSetCTarif(m1Acc, maxClientTarif().pack())
+
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 1)
+        await usersTarifsStore.adminSetPTarif(m1Acc, maxParentTarif().pack(), 1)
+        span49h()
+
+        {
+            await usersTarifsStore.adminSetPTarif(uAcc, 0, 1)
+
+            await usersTarifsStore.adminSetRank(uAcc, 10)
+            await usersTarifsStore.adminSetRank(m1Acc, 10)
+            await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[0], uAcc)
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            // console.log(ext2)
+
+            assert.equal(ext2.finance.B, 120)
+        }
+
+        {
+            const bal = await makeBalancer()
+            await usersTarifsStore.reject({ from: uAcc })
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            assert.equal(ext2.uAcc.B, 120)
+            // console.log(ext2)
+        }
+
+        {
+            await usersTarifsStore.adminSetPTarif(uAcc, 0, 1)
+
+            await usersTarifsStore.adminSetRank(uAcc, 10)
+            await usersTarifsStore.adminSetRank(m1Acc, 10)
+            await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[0], uAcc)
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            // console.log(ext2)
+
+            assert.equal(ext2.finance.B, 120)
+        }
+
+        {
+            const bal = await makeBalancer()
+            await usersTarifsStore.reject({ from: uAcc })
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            assert.equal(ext2.uAcc.B, 120)
+            // console.log(ext2)
+        }
+
+
+        {
+            await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 10)
+
+            await usersTarifsStore.adminSetRank(uAcc, 10)
+            await usersTarifsStore.adminSetRank(m1Acc, 10)
+            await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+
+            const bal = await makeBalancer()
+            await buyTarif(partnerTarifs[0], uAcc)
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            // console.log(ext2)
+
+            assert.equal(ext2.finance.B, 120)
+        }
+
+        {
+            const bal = await makeBalancer()
+            await usersTarifsStore.reject({ from: uAcc })
+            await bal.append()
+
+            const { ext2 } = bal.diff()
+            assert.equal(ext2.uAcc.B, 120)
+            // console.log(ext2)
+        }
     })
 }

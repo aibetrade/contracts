@@ -90,5 +90,5 @@ module.exports = {
     span49h,
     span31d,
     span366d,
-    mustFail
+    mustFail    
 }

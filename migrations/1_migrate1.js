@@ -49,10 +49,19 @@ async function baseInstllation(deployer, network, accounts) {
   await deployer.deploy(UsersTarifsStore, usersFinance.address);
   const usersTarifsStore = await UsersTarifsStore.deployed()
   await usersFinance.appendOwner(usersTarifsStore.address)
+  await usersTarifsStore.setActionEnabled(true)
+
+  await deployer.link(TarifDataLib, TarifsStoreBase);
+  const clientTarifsStore = await deployer.deploy(TarifsStoreBase);
+  await clientTarifsStore.appendOwner(usersTarifsStore.address);
+  await usersTarifsStore.setClientTarifs(clientTarifsStore.address);
+
+  const partnerTarifsStore = await deployer.deploy(TarifsStoreBase);
+  await partnerTarifsStore.appendOwner(usersTarifsStore.address);
+  await usersTarifsStore.setPartnerTarifs(partnerTarifsStore.address);
 
   await deployer.link(TarifDataLib, Referal);
-  // await deployer.deploy(Referal, usersTarifsStore.address, usersTreeStore.address);
-  await deployer.deploy(Referal);
+    await deployer.deploy(Referal);
 
   const referal = await Referal.deployed();
   await referal.setRegisterPrice(conf.registerPrice)

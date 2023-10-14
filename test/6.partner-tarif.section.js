@@ -37,12 +37,33 @@ module.exports = () => {
         await mustFail(buyTarif(partnerTarifs[3], uAcc))
     })
 
-    it("Can buy same OR better tarif after fill and 48h", async function () {
+    it("Can buy same tarif after fill and 48h", async function () {
         const { uAcc, usersTree, usersTarifsStore, usersFinance, referal } = await init();
+
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 1)
+
+        await span49h();
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+        await buyTarif(partnerTarifs[0], uAcc)
+
+        await span49h();
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+        await buyTarif(partnerTarifs[0], uAcc)
+
+        await span49h();
+        await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
+        await buyTarif(partnerTarifs[0], uAcc)
+    })
+
+
+    it("Can buy better tarif after fill and 48h", async function () {
+        const { uAcc, usersTree, usersTarifsStore, usersFinance, referal } = await init();
+
+        await usersTarifsStore.adminSetPTarif(uAcc, partnerTarifs[0].pack(), 1)
 
         await span49h();
         await usersTarifsStore.setUsage(uAcc, 0, 0, 100);        
-        await mustFail(buyTarif(partnerTarifs[0], uAcc))
+        await buyTarif(partnerTarifs[0], uAcc)
         
         await span49h();
         await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
@@ -67,7 +88,7 @@ module.exports = () => {
         await usersTarifsStore.setUsage(uAcc, 0, 0, 100);
 
         const cTarif = await usersTarifsStore.cTarifs(uAcc)
-        console.log(Number(cTarif.boughtAt), Number(cTarif.endsAt))
+        // console.log(Number(cTarif.boughtAt), Number(cTarif.endsAt))
 
         await mustFail(buyTarif(partnerTarifs[3], uAcc))
         

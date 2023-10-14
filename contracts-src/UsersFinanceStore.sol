@@ -100,7 +100,7 @@ contract UsersFinanceStore is MultyOwner {
         BuyHistoryRec storage buy = users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
         buy.state = BUY_STATE_REJECTED;
         
-        erc20.transfer(_acc, buy.payedCent);
+        erc20.transfer(_acc, centToErc20(buy.payedCent));
         comsaExists[_acc] = false;
     }
 

@@ -67,9 +67,6 @@ async function getRollback(acc) {
     }
 }
 
-
-
-
 module.exports = {
     maxClientTarif,
     maxParentTarif,

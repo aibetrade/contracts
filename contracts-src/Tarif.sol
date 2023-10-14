@@ -44,17 +44,25 @@ contract TarifsStoreBase is MultyOwner {
     }
 }
 
-contract TarifsStore {
+contract TarifsStore is MultyOwner {
     TarifsStoreBase public clientTarifs;
     TarifsStoreBase public partnerTarifs;
 
-    constructor() {
-        clientTarifs = new TarifsStoreBase();
-        partnerTarifs = new TarifsStoreBase();
-
-        clientTarifs.appendOwner(msg.sender);
-        partnerTarifs.appendOwner(msg.sender);
+    function setClientTarifs(TarifsStoreBase _clientTarifs) public onlyOwner{
+        clientTarifs = _clientTarifs;
     }
+    
+    function setPartnerTarifs(TarifsStoreBase _partnerTarifs) public onlyOwner{
+        partnerTarifs = _partnerTarifs;
+    }
+
+    // constructor() {
+    //     clientTarifs = new TarifsStoreBase();
+    //     partnerTarifs = new TarifsStoreBase();
+
+    //     clientTarifs.appendOwner(msg.sender);
+    //     partnerTarifs.appendOwner(msg.sender);
+    // }
 
     function isT1BetterOrSameT2(
         uint16 _tarifKey1,

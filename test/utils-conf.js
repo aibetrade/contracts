@@ -17,9 +17,22 @@ for (let i = 0; i < tarifsConf.ranks.length; i++){
 
 const inviteBonusHash = tarifsConf.matrix
 
+function compress(bco) {    
+    const keys = Object.keys(bco)
+    if (typeof(bco) != 'object' || keys.length == 1) return bco;
+    
+    const i0 = keys.length / 2
+    const ret = []
+    for (let i = i0; i < keys.length; i++) {
+        ret.push(BigInt(bco[keys[i]]));
+    }
+    return ret
+}
+
 module.exports = {
     clientTarifs, 
     partnerTarifs, 
     inviteBonusHash,
-    allRanks    
+    allRanks,
+    compress
 }

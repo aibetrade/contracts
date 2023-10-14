@@ -129,17 +129,25 @@ contract TarifsStoreBase is MultyOwner {
     }
 }
 
-contract TarifsStore {
+contract TarifsStore is MultyOwner {
     TarifsStoreBase public clientTarifs;
     TarifsStoreBase public partnerTarifs;
 
-    constructor() {
-        clientTarifs = new TarifsStoreBase();
-        partnerTarifs = new TarifsStoreBase();
-
-        clientTarifs.appendOwner(msg.sender);
-        partnerTarifs.appendOwner(msg.sender);
+    function setClientTarifs(TarifsStoreBase _clientTarifs) public onlyOwner{
+        clientTarifs = _clientTarifs;
     }
+    
+    function setPartnerTarifs(TarifsStoreBase _partnerTarifs) public onlyOwner{
+        partnerTarifs = _partnerTarifs;
+    }
+
+    // constructor() {
+    //     clientTarifs = new TarifsStoreBase();
+    //     partnerTarifs = new TarifsStoreBase();
+
+    //     clientTarifs.appendOwner(msg.sender);
+    //     partnerTarifs.appendOwner(msg.sender);
+    // }
 
     function isT1BetterOrSameT2(
         uint16 _tarifKey1,
@@ -330,7 +338,7 @@ contract UsersFinanceStore is MultyOwner {
         BuyHistoryRec storage buy = users[_acc].buyHistory[users[_acc].buyHistory.length - 1];
         buy.state = BUY_STATE_REJECTED;
         
-        erc20.transfer(_acc, buy.payedCent);
+        erc20.transfer(_acc, centToErc20(buy.payedCent));
         comsaExists[_acc] = false;
     }
 
@@ -382,8 +390,7 @@ struct UsageRec {
 }
 
 // Manage users info here
-contract UsersTarifsStore is TarifsStore, MultyOwner {
-    // mapping(address => UserStruct) public users;
+contract UsersTarifsStore is TarifsStore {
     mapping(address => UserTarifStruct) public cTarifs;
     mapping(address => UserTarifStruct) public pTarifs;
     mapping(address => RollbackStruct) public rollbacks;
@@ -409,27 +416,32 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
     }    
 
     // --- Admin section ---
-    function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
-        cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, block.timestamp + clientTarifLength, true);
+    // function adminSetCTarif(address _acc, uint256 _cTarif) public onlyOwner {
+    //     cTarifs[_acc] = UserTarifStruct(_cTarif, block.timestamp, block.timestamp + clientTarifLength, true);
+    // }
+
+    function adminSetCTarif(address _acc, UserTarifStruct memory _tarif) public onlyOwner {
+        cTarifs[_acc] = _tarif;
     }
 
-    function adminSetPTarif(address _acc, uint256 _pTarif, uint8 level) public onlyOwner {
+    function adminSetPTarif(address _acc, UserTarifStruct memory _tarif) public onlyOwner {
         registered[_acc] = true;
-        pTarifs[_acc] = UserTarifStruct(_pTarif, block.timestamp, block.timestamp + YEAR, true);
-        usage[_acc] = UsageRec(
-            level * TarifDataLib.getNumSlots(_pTarif),
-            level * TarifDataLib.getNumLVSlots(_pTarif),
-            level, 0);
+        pTarifs[_acc] = _tarif; //UserTarifStruct(_pTarif, block.timestamp, block.timestamp + YEAR, true);
+        // usage[_acc] = UsageRec(
+        //     level * TarifDataLib.getNumSlots(_pTarif),
+        //     level * TarifDataLib.getNumLVSlots(_pTarif),
+        //     level, 0);
     }
 
     function adminSetRegistered(address _acc) public onlyOwner {
         registered[_acc] = true;
     }
 
-    function setUsage(address _acc, uint16 _freeSlots, uint16 _freeLVSlots, uint16 _filled) public onlyOwner {
-        usage[_acc].freeSlots = _freeSlots;
-        usage[_acc].freeLVSlots = _freeLVSlots;
-        usage[_acc].filled = _filled;
+    function setUsage(address _acc, UsageRec memory _usage) public onlyOwner {
+        usage[_acc] = _usage;
+        // usage[_acc].freeSlots = _freeSlots;
+        // usage[_acc].freeLVSlots = _freeLVSlots;
+        // usage[_acc].filled = _filled;
     }
 
     function adminSetRank(address _acc, uint8 _rank) public onlyOwner {        
@@ -456,12 +468,12 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
 
     // --- User space
 
-    function isClientTarifActive(address _client) public view returns (bool) {
-        return block.timestamp < cTarifs[_client].endsAt;
+    function isClientTarifActive(address _acc) public view returns (bool) {
+        return cTarifs[_acc].tarif != 0 && block.timestamp < cTarifs[_acc].endsAt;
     }
 
-    function isPartnerTarifActive(address _partner) public view returns (bool) {
-        return block.timestamp - pTarifs[_partner].boughtAt <= YEAR;
+    function isPartnerTarifActive(address _acc) public view returns (bool) {
+        return pTarifs[_acc].tarif != 0 && block.timestamp - pTarifs[_acc].boughtAt <= YEAR;
     }
 
     function getNextBuyCount(address _acc, uint16 _tarifKey) public view returns(uint16) {
@@ -513,8 +525,11 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         require(buyCount > 0);
 
         uint32 payPrice = TarifDataLib.getPrice(_tarif);
-        if (isPartnerActive(_acc) && (level == getLevel(_acc))){
-            payPrice = TarifDataLib.getPrice(pTarif(_acc));
+        if (!isPartnerTarifActive(_acc)){
+            level = 1;
+        }
+        else if (level == getLevel(_acc)){
+            payPrice -= TarifDataLib.getPrice(pTarif(_acc));
         }
         usersFinance.freezeMoney(payPrice * buyCount, _acc);
 
@@ -523,9 +538,6 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
         rollbacks[_acc].endsAt = pTarifs[_acc].endsAt;
         rollbacks[_acc].usage = usage[_acc];
 
-        pTarifs[_acc].tarif = _tarif;
-        pTarifs[_acc].boughtAt = block.timestamp;
-        pTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
         if (isPartnerTarifActive(_acc)){
             usage[_acc].freeSlots += TarifDataLib.getNumSlots(_tarif) * buyCount;
             usage[_acc].freeLVSlots += TarifDataLib.getNumLVSlots(_tarif) * buyCount;
@@ -535,13 +547,17 @@ contract UsersTarifsStore is TarifsStore, MultyOwner {
             usage[_acc].freeLVSlots = TarifDataLib.getNumLVSlots(_tarif);
         }
 
+        pTarifs[_acc].tarif = _tarif;
+        pTarifs[_acc].boughtAt = block.timestamp;
+        pTarifs[_acc].endsAt = block.timestamp + clientTarifLength;
+
         usersFinance.addUserBuy(_acc,
             BuyHistoryRec({
                 tarif: _tarif,
                 timestamp: block.timestamp,
                 count: buyCount,
                 state: 0,
-                payedCent: payPrice * buyCount
+                payedCent: payPrice * buyCount * 100
             })
         );
 
@@ -950,7 +966,7 @@ contract Referal is MultyOwner {
         BuyHistoryRec memory buy = usersFinance.getLastBuy(_client);
 
         uint256 _tarif = buy.tarif;
-        uint32 basePriceCent = uint32(buy.count) * TarifDataLib.getPrice(_tarif) * 100;        
+        uint32 basePriceCent = buy.payedCent;
 
         uint32 curPriceCent = basePriceCent;
         usersTarifsStore.useFill(mentor);
@@ -1050,7 +1066,7 @@ contract Referal is MultyOwner {
         require(
             usersTarifsStore.registered(msg.sender)
             && usersTarifsStore.hasActiveMaxClientTarif(msg.sender)
-            && usersTarifsStore.isPartnerFullfilled(msg.sender)
+            && (!usersTarifsStore.isPartnerTarifActive(msg.sender) || usersTarifsStore.isPartnerFullfilled(msg.sender))
             && canBuy(msg.sender), "E118");
 
         // Если предыдущую комсу не забрали, заберем ее.

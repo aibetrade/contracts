@@ -136,7 +136,7 @@ module.exports = () => {
 
         // Check balances
         const diff = bal.diff()
-        assert.equal(diff.bals[m1Acc], nextBuy.price)
-        assert.equal(diff.bals[usersFinance.address], -nextBuy.price)
+        assert.equal(diff.bals[m1Acc], 1158)
+        assert.equal(diff.bals[usersFinance.address], -1158)
     })      
 }
